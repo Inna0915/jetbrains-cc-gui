@@ -208,7 +208,8 @@
         "providerUnavailable": "Currently unavailable",
         "provider": {
           "claude": "Claude Code",
-          "codex": "Codex"
+          "codex": "Codex",
+          "agy": "Antigravity"
         },
         "currentProviderAuto": "Currently using automatic selection: {{provider}}",
         "currentProviderManual": "Currently using manually selected provider: {{provider}}",
@@ -310,7 +311,8 @@
     },
     "providerTab": {
       "claude": "Claude Code",
-      "codex": "Codex"
+      "codex": "Codex",
+      "agy": "Antigravity"
     },
     "pluginModels": {
       "title": "Custom Models",
@@ -1629,6 +1631,9 @@
     },
     "opencode": {
       "label": "OpenCode"
+    },
+    "agy": {
+      "label": "Antigravity"
     }
   },
   "promptEnhancer": {

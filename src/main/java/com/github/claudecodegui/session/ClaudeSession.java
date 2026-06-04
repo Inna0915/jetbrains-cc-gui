@@ -3,6 +3,7 @@ package com.github.claudecodegui.session;
 import com.github.claudecodegui.permission.PermissionManager;
 import com.github.claudecodegui.permission.PermissionRequest;
 import com.github.claudecodegui.provider.claude.ClaudeSDKBridge;
+import com.github.claudecodegui.provider.agy.AgySDKBridge;
 import com.github.claudecodegui.provider.codex.CodexSDKBridge;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -50,6 +51,7 @@ public class ClaudeSession {
     // SDK bridges
     private final ClaudeSDKBridge claudeSDKBridge;
     private final CodexSDKBridge codexSDKBridge;
+    private final AgySDKBridge agySDKBridge;
 
     // Permission manager
     private final PermissionManager permissionManager = new PermissionManager();
@@ -135,6 +137,7 @@ public class ClaudeSession {
         this.project = project;
         this.claudeSDKBridge = claudeSDKBridge;
         this.codexSDKBridge = codexSDKBridge;
+        this.agySDKBridge = new com.github.claudecodegui.provider.agy.AgySDKBridge(project);
 
         // Initialize managers
         this.state = new com.github.claudecodegui.session.SessionState();
@@ -143,7 +146,7 @@ public class ClaudeSession {
         this.contextCollector = new com.github.claudecodegui.session.EditorContextCollector(project);
         this.callbackFacade = new SessionCallbackFacade(project);
         this.contextService = new SessionContextService(project, MAX_FILE_SIZE_BYTES);
-        this.providerRouter = new SessionProviderRouter(claudeSDKBridge, codexSDKBridge);
+        this.providerRouter = new SessionProviderRouter(claudeSDKBridge, codexSDKBridge, agySDKBridge);
         this.sendService = new SessionSendService(
                 project,
                 state,
@@ -153,6 +156,7 @@ public class ClaudeSession {
                 gson,
                 claudeSDKBridge,
                 codexSDKBridge,
+                agySDKBridge,
                 contextService
         );
         this.messageOrchestrator = new SessionMessageOrchestrator(
@@ -213,7 +217,7 @@ public class ClaudeSession {
     }
 
     /**
-     * 提供底层会话状态访问，用于历史恢复等需要直接重建会话内存态的场景。
+     * Provide access to session state.
      */
     public SessionState getState() {
         return state;

@@ -3,6 +3,7 @@ import { sendBridgeEvent } from '../../utils/bridge';
 import {
   CLAUDE_MODELS,
   CODEX_MODELS,
+  AGY_MODELS,
   isValidPermissionMode,
   normalizeClaudeModelId,
   apply1MContextSuffix,
@@ -30,8 +31,10 @@ export interface UseModelStatePersistenceOptions {
   setCurrentProvider: (value: string) => void;
   setSelectedClaudeModel: (value: string) => void;
   setSelectedCodexModel: (value: string) => void;
+  setSelectedAgyModel: (value: string) => void;
   setClaudePermissionMode: (value: PermissionMode) => void;
   setCodexPermissionMode: (value: PermissionMode) => void;
+  setAgyPermissionMode: (value: PermissionMode) => void;
   setPermissionMode: (value: PermissionMode) => void;
   setLongContextEnabled: (value: boolean) => void;
   setReasoningEffort: (value: ReasoningEffort) => void;
@@ -39,58 +42,58 @@ export interface UseModelStatePersistenceOptions {
   currentProvider: string;
   selectedClaudeModel: string;
   selectedCodexModel: string;
+  selectedAgyModel: string;
   claudePermissionMode: PermissionMode;
   codexPermissionMode: PermissionMode;
+  agyPermissionMode: PermissionMode;
   longContextEnabled: boolean;
   reasoningEffort: ReasoningEffort;
 }
 
 /**
- * Two effects for persisting cross-slice provider/model state to localStorage:
- *  1. On mount: hydrate state from localStorage and sync the restored values
- *     to the backend (retrying until the JCEF bridge is ready).
- *  2. On change: re-save the snapshot to localStorage.
- *
- * Save uses `JSON.stringify` of the seven persisted keys; load applies
- * defensive validation (custom models lookup, permission mode allowlist,
- * reasoning effort allowlist) before invoking the slice setters.
+ * Hydrates state from localStorage on mount and saves on any changes.
+ * Supports claude, codex, and agy providers.
  */
 export function useModelStatePersistence(options: UseModelStatePersistenceOptions) {
   const {
     setCurrentProvider,
     setSelectedClaudeModel,
     setSelectedCodexModel,
+    setSelectedAgyModel,
     setClaudePermissionMode,
     setCodexPermissionMode,
+    setAgyPermissionMode,
     setPermissionMode,
     setLongContextEnabled,
     setReasoningEffort,
     currentProvider,
     selectedClaudeModel,
     selectedCodexModel,
+    selectedAgyModel,
     claudePermissionMode,
     codexPermissionMode,
+    agyPermissionMode,
     longContextEnabled,
     reasoningEffort,
   } = options;
 
   // Hydrate from localStorage and sync to backend (mount only).
-  // Setters are stable; deps left empty to ensure single execution.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       let restoredProvider = 'claude';
       let restoredClaudeModel = CLAUDE_MODELS[0].id;
       let restoredCodexModel = CODEX_MODELS[0].id;
+      let restoredAgyModel = AGY_MODELS[0].id;
       let restoredClaudePermissionMode: PermissionMode = 'bypassPermissions';
       let restoredCodexPermissionMode: PermissionMode = 'default';
+      let restoredAgyPermissionMode: PermissionMode = 'default';
       let restoredLongContextEnabled = true;
 
       if (saved) {
         const state = JSON.parse(saved);
 
-        if (['claude', 'codex'].includes(state.provider)) {
+        if (['claude', 'codex', 'agy'].includes(state.provider)) {
           restoredProvider = state.provider;
           setCurrentProvider(state.provider);
         }
@@ -102,6 +105,9 @@ export function useModelStatePersistence(options: UseModelStatePersistenceOption
           restoredCodexPermissionMode = state.codexPermissionMode === 'plan'
             ? 'default'
             : state.codexPermissionMode;
+        }
+        if (isValidPermissionMode(state.agyPermissionMode)) {
+          restoredAgyPermissionMode = state.agyPermissionMode;
         }
 
         if (typeof state.longContextEnabled === 'boolean') {
@@ -132,13 +138,22 @@ export function useModelStatePersistence(options: UseModelStatePersistenceOption
           restoredCodexModel = state.codexModel;
           setSelectedCodexModel(state.codexModel);
         }
+
+        if (AGY_MODELS.find(m => m.id === state.agyModel)) {
+          restoredAgyModel = state.agyModel;
+          setSelectedAgyModel(state.agyModel);
+        }
       }
 
       const initialPermissionMode: PermissionMode = restoredProvider === 'codex'
         ? restoredCodexPermissionMode
+        : restoredProvider === 'agy'
+        ? restoredAgyPermissionMode
         : restoredClaudePermissionMode;
+
       setClaudePermissionMode(restoredClaudePermissionMode);
       setCodexPermissionMode(restoredCodexPermissionMode);
+      setAgyPermissionMode(restoredAgyPermissionMode);
       setPermissionMode(initialPermissionMode);
 
       let syncRetryCount = 0;
@@ -149,6 +164,8 @@ export function useModelStatePersistence(options: UseModelStatePersistenceOption
           sendBridgeEvent('set_provider', restoredProvider);
           const modelToSync = restoredProvider === 'codex'
             ? restoredCodexModel
+            : restoredProvider === 'agy'
+            ? restoredAgyModel
             : apply1MContextSuffix(restoredClaudeModel, restoredLongContextEnabled);
           sendBridgeEvent('set_model', modelToSync);
           sendBridgeEvent('set_mode', initialPermissionMode);
@@ -161,32 +178,35 @@ export function useModelStatePersistence(options: UseModelStatePersistenceOption
       };
       setTimeout(syncToBackend, 200);
     } catch {
-      // Failed to load model selection state — fall back to defaults already
-      // set by individual slice hooks.
+      // ignore
     }
   }, []);
 
-  // Persist snapshot whenever any of the seven keys change.
+  // Persist snapshot whenever any of the keys change.
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         provider: currentProvider,
         claudeModel: selectedClaudeModel,
         codexModel: selectedCodexModel,
+        agyModel: selectedAgyModel,
         claudePermissionMode,
         codexPermissionMode,
+        agyPermissionMode,
         longContextEnabled,
         reasoningEffort,
       }));
     } catch {
-      // Failed to save model selection state — non-fatal.
+      // ignore
     }
   }, [
     currentProvider,
     selectedClaudeModel,
     selectedCodexModel,
+    selectedAgyModel,
     claudePermissionMode,
     codexPermissionMode,
+    agyPermissionMode,
     longContextEnabled,
     reasoningEffort,
   ]);

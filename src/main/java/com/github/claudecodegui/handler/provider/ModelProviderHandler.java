@@ -53,6 +53,18 @@ public class ModelProviderHandler {
         MODEL_CONTEXT_LIMITS.put("o1", 200_000);
         MODEL_CONTEXT_LIMITS.put("o1-mini", 128_000);
         MODEL_CONTEXT_LIMITS.put("o1-preview", 128_000);
+        // Gemini models
+        MODEL_CONTEXT_LIMITS.put("gemini-1.5-pro", 2_000_000);
+        MODEL_CONTEXT_LIMITS.put("gemini-1.5-flash", 1_000_000);
+        MODEL_CONTEXT_LIMITS.put("gemini-2.0-flash", 1_000_000);
+        MODEL_CONTEXT_LIMITS.put("Gemini 3.5 Flash (High)", 1_000_000);
+        MODEL_CONTEXT_LIMITS.put("Gemini 3.5 Flash (Medium)", 1_000_000);
+        MODEL_CONTEXT_LIMITS.put("Gemini 3.5 Flash (Low)", 1_000_000);
+        MODEL_CONTEXT_LIMITS.put("Gemini 3.1 Pro (High)", 2_000_000);
+        MODEL_CONTEXT_LIMITS.put("Gemini 3.1 Pro (Low)", 1_000_000);
+        MODEL_CONTEXT_LIMITS.put("Claude Sonnet 4.6 (Thinking)", 200_000);
+        MODEL_CONTEXT_LIMITS.put("Claude Opus 4.6 (Thinking)", 200_000);
+        MODEL_CONTEXT_LIMITS.put("GPT-OSS 120B (Medium)", 128_000);
     }
 
     private final HandlerContext context;

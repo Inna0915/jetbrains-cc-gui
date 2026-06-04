@@ -10,6 +10,7 @@ import type { PermissionMode } from '../components/ChatInputBox/types';
 import { isSpecialProviderId } from '../types/provider';
 import { useClaudeProvider } from './providers/useClaudeProvider';
 import { useCodexProvider } from './providers/useCodexProvider';
+import { useAgyProvider } from './providers/useAgyProvider';
 import { useUsageTracking } from './providers/useUsageTracking';
 import { useProviderSettings } from './providers/useProviderSettings';
 import { useModelStatePersistence } from './providers/useModelStatePersistence';
@@ -22,18 +23,9 @@ export interface UseModelProviderStateOptions {
 }
 
 /**
- * Orchestrates provider/model/permission state. Composes four single-purpose
- * sub-hooks (Claude / Codex / usage tracking / provider settings) plus a
- * persistence hook, then wires the cross-slice state (currentProvider +
- * permissionMode) and the cross-provider handlers (mode/model/provider switch,
- * long-context toggle, always-thinking toggle).
- *
- * The flat return shape is preserved as the public API: callers (App,
- * ChatScreen, AppDialogs, useMessageSender) destructure individual fields.
- *
- * `currentProviderRef` is exposed for window callbacks registered with stable
- * identity that must read the current provider when fired by the JCEF bridge.
- * The ref is updated via render-time assignment (no useEffect mirror).
+ * Orchestrates provider/model/permission state. Composes five single-purpose
+ * sub-hooks (Claude / Codex / Agy / usage tracking / provider settings) plus a
+ * persistence hook.
  */
 export function useModelProviderState({ addToast, t }: UseModelProviderStateOptions) {
   // ── Cross-slice state owned by the orchestrator ──
@@ -41,14 +33,13 @@ export function useModelProviderState({ addToast, t }: UseModelProviderStateOpti
   const [permissionMode, setPermissionMode] = useState<PermissionMode>('bypassPermissions');
 
   // External-facing ref so window callbacks can read the latest provider
-  // without re-binding. Render-time assignment avoids the useRef + useEffect
-  // mirror anti-pattern (rule 5.15).
   const currentProviderRef = useRef(currentProvider);
   currentProviderRef.current = currentProvider;
 
   // ── Provider-specific sub-hooks ──
   const claude = useClaudeProvider();
   const codex = useCodexProvider();
+  const agy = useAgyProvider();
   const { isSdkInstalled, ...usage } = useUsageTracking();
   const settings = useProviderSettings({ addToast, t });
 
@@ -63,28 +54,41 @@ export function useModelProviderState({ addToast, t }: UseModelProviderStateOpti
     codexPermissionMode, setCodexPermissionMode,
     reasoningEffort, setReasoningEffort,
   } = codex;
+  const {
+    selectedAgyModel, setSelectedAgyModel,
+    agyPermissionMode, setAgyPermissionMode,
+  } = agy;
 
   // ── Persistence: load on mount + save on change ──
   useModelStatePersistence({
     setCurrentProvider,
     setSelectedClaudeModel,
     setSelectedCodexModel,
+    setSelectedAgyModel,
     setClaudePermissionMode,
     setCodexPermissionMode,
+    setAgyPermissionMode,
     setPermissionMode,
     setLongContextEnabled,
     setReasoningEffort,
     currentProvider,
     selectedClaudeModel,
     selectedCodexModel,
+    selectedAgyModel,
     claudePermissionMode,
     codexPermissionMode,
+    agyPermissionMode,
     longContextEnabled,
     reasoningEffort,
   });
 
   // ── Computed values ──
-  const selectedModel = currentProvider === 'codex' ? selectedCodexModel : selectedClaudeModel;
+  const selectedModel = currentProvider === 'codex'
+    ? selectedCodexModel
+    : currentProvider === 'agy'
+    ? selectedAgyModel
+    : selectedClaudeModel;
+
   const currentSdkInstalled = useMemo(
     () => isSdkInstalled(currentProvider),
     [isSdkInstalled, currentProvider],
@@ -99,10 +103,16 @@ export function useModelProviderState({ addToast, t }: UseModelProviderStateOpti
       sendBridgeEvent('set_mode', codexMode);
       return;
     }
+    if (currentProvider === 'agy') {
+      setPermissionMode(mode);
+      setAgyPermissionMode(mode);
+      sendBridgeEvent('set_mode', mode);
+      return;
+    }
     setPermissionMode(mode);
     setClaudePermissionMode(mode);
     sendBridgeEvent('set_mode', mode);
-  }, [currentProvider, setCodexPermissionMode, setClaudePermissionMode]);
+  }, [currentProvider, setCodexPermissionMode, setAgyPermissionMode, setClaudePermissionMode]);
 
   const handleModelSelect = useCallback((modelId: string) => {
     if (currentProvider === 'claude') {
@@ -113,8 +123,11 @@ export function useModelProviderState({ addToast, t }: UseModelProviderStateOpti
     } else if (currentProvider === 'codex') {
       setSelectedCodexModel(modelId);
       sendBridgeEvent('set_model', modelId);
+    } else if (currentProvider === 'agy') {
+      setSelectedAgyModel(modelId);
+      sendBridgeEvent('set_model', modelId);
     }
-  }, [currentProvider, longContextEnabled, setSelectedClaudeModel, setSelectedCodexModel]);
+  }, [currentProvider, longContextEnabled, setSelectedClaudeModel, setSelectedCodexModel, setSelectedAgyModel]);
 
   const handleProviderSelect = useCallback((providerId: string) => {
     setCurrentProvider(providerId);
@@ -122,19 +135,25 @@ export function useModelProviderState({ addToast, t }: UseModelProviderStateOpti
 
     const modeToSet: PermissionMode = providerId === 'codex'
       ? (codexPermissionMode === 'plan' ? 'default' : codexPermissionMode)
+      : providerId === 'agy'
+      ? agyPermissionMode
       : claudePermissionMode;
     setPermissionMode(modeToSet);
     sendBridgeEvent('set_mode', modeToSet);
 
     const newModel = providerId === 'codex'
       ? selectedCodexModel
+      : providerId === 'agy'
+      ? selectedAgyModel
       : apply1MContextSuffix(selectedClaudeModel, longContextEnabled);
     sendBridgeEvent('set_model', newModel);
   }, [
     claudePermissionMode,
     codexPermissionMode,
+    agyPermissionMode,
     selectedCodexModel,
     selectedClaudeModel,
+    selectedAgyModel,
     longContextEnabled,
   ]);
 
@@ -187,6 +206,7 @@ export function useModelProviderState({ addToast, t }: UseModelProviderStateOpti
   return {
     ...claude,
     ...codex,
+    ...agy,
     ...usage,
     ...settings,
     currentProvider, setCurrentProvider,

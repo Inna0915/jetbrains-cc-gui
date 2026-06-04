@@ -5,6 +5,8 @@ import com.github.claudecodegui.settings.CodemossSettingsService;
 import com.github.claudecodegui.notifications.ClaudeNotifier;
 import com.github.claudecodegui.provider.claude.ClaudeSDKBridge;
 import com.github.claudecodegui.provider.codex.CodexSDKBridge;
+import com.github.claudecodegui.provider.agy.AgySDKBridge;
+import com.github.claudecodegui.provider.agy.AgyMessageHandler;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.intellij.openapi.diagnostic.Logger;
@@ -28,6 +30,7 @@ public class SessionSendService {
     private final Gson gson;
     private final ClaudeSDKBridge claudeSDKBridge;
     private final CodexSDKBridge codexSDKBridge;
+    private final AgySDKBridge agySDKBridge;
     private final SessionContextService contextService;
 
     public SessionSendService(
@@ -39,6 +42,7 @@ public class SessionSendService {
             Gson gson,
             ClaudeSDKBridge claudeSDKBridge,
             CodexSDKBridge codexSDKBridge,
+            AgySDKBridge agySDKBridge,
             SessionContextService contextService
     ) {
         this.project = project;
@@ -49,6 +53,7 @@ public class SessionSendService {
         this.gson = gson;
         this.claudeSDKBridge = claudeSDKBridge;
         this.codexSDKBridge = codexSDKBridge;
+        this.agySDKBridge = agySDKBridge;
         this.contextService = contextService;
     }
 
@@ -119,6 +124,15 @@ public class SessionSendService {
                     openedFilesJson,
                     agentPrompt,
                     fileTagPaths,
+                    effectivePermissionMode
+            );
+        } else if ("agy".equals(currentProvider)) {
+            return sendToAgy(
+                    channelId,
+                    input,
+                    attachments,
+                    openedFilesJson,
+                    agentPrompt,
                     effectivePermissionMode
             );
         }
@@ -200,6 +214,36 @@ public class SessionSendService {
                 state.getModel(),
                 agentPrompt,
                 state.getReasoningEffort(),
+                handler
+        ).thenApply(result -> null);
+    }
+
+    private CompletableFuture<Void> sendToAgy(
+            String channelId,
+            String input,
+            List<ClaudeSession.Attachment> attachments,
+            JsonObject openedFilesJson,
+            String agentPrompt,
+            String effectivePermissionMode
+    ) {
+        AgyMessageHandler handler = new AgyMessageHandler(
+                project,
+                state,
+                callbackFacade.getCallbackHandler()
+        );
+
+        final String currentModel = state.getModel();
+        LOG.info("[Lifecycle] sendToAgy sessionId=" + (state.getSessionId() != null ? state.getSessionId() : "(new)")
+                + ", cwd=" + state.getCwd()
+                + ", model=" + currentModel);
+
+        return agySDKBridge.sendMessage(
+                channelId,
+                input,
+                state.getSessionId(),
+                state.getCwd(),
+                effectivePermissionMode,
+                currentModel,
                 handler
         ).thenApply(result -> null);
     }
@@ -288,18 +332,18 @@ public class SessionSendService {
                 if (agent != null && agent.has("prompt") && !agent.get("prompt").isJsonNull()) {
                     String agentPrompt = agent.get("prompt").getAsString();
                     String agentName = agent.has("name") ? agent.get("name").getAsString() : "Unknown";
-                    LOG.info("[Agent] ✓ Found agent: " + agentName);
-                    LOG.info("[Agent] ✓ Prompt length: " + agentPrompt.length() + " chars");
-                    LOG.info("[Agent] ✓ Prompt preview: "
+                    LOG.info("[Agent] ✔ Found agent: " + agentName);
+                    LOG.info("[Agent] ✔ Prompt length: " + agentPrompt.length() + " chars");
+                    LOG.info("[Agent] ✔ Prompt preview: "
                             + (agentPrompt.length() > 100 ? agentPrompt.substring(0, 100) + "..." : agentPrompt));
                     return agentPrompt;
                 }
-                LOG.info("[Agent] ✗ Agent found but no prompt configured");
+                LOG.info("[Agent] ✔ Agent found but no prompt configured");
             } else {
-                LOG.info("[Agent] ✗ No agent selected");
+                LOG.info("[Agent] ✔ No agent selected");
             }
         } catch (Exception e) {
-            LOG.warn("[Agent] ✗ Failed to get agent prompt: " + e.getMessage());
+            LOG.warn("[Agent] ✔ Failed to get agent prompt: " + e.getMessage());
         }
         return null;
     }

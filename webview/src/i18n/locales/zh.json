@@ -208,7 +208,8 @@
         "providerUnavailable": "当前不可用",
         "provider": {
           "claude": "Claude Code",
-          "codex": "Codex"
+          "codex": "Codex",
+          "agy": "反重力"
         },
         "currentProviderAuto": "当前使用自动选择：{{provider}}",
         "currentProviderManual": "当前使用手动选择的 provider：{{provider}}",
@@ -310,7 +311,8 @@
     },
     "providerTab": {
       "claude": "Claude Code",
-      "codex": "Codex"
+      "codex": "Codex",
+      "agy": "反重力"
     },
     "pluginModels": {
       "title": "自定义模型",
@@ -1634,6 +1636,9 @@
     },
     "opencode": {
       "label": "OpenCode"
+    },
+    "agy": {
+      "label": "反重力"
     }
   },
   "promptEnhancer": {

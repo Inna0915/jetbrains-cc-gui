@@ -392,6 +392,52 @@ export const CODEX_MODELS: ModelInfo[] = [
 ];
 
 /**
+ * Antigravity (agy) model list
+ */
+export const AGY_MODELS: ModelInfo[] = [
+  {
+    id: 'Gemini 3.5 Flash (High)',
+    label: 'Gemini 3.5 Flash (High)',
+    description: 'Gemini 3.5 Flash (High) · Fast reasoning, high quality',
+  },
+  {
+    id: 'Gemini 3.5 Flash (Medium)',
+    label: 'Gemini 3.5 Flash (Medium)',
+    description: 'Gemini 3.5 Flash (Medium) · Fast reasoning, medium quality',
+  },
+  {
+    id: 'Gemini 3.5 Flash (Low)',
+    label: 'Gemini 3.5 Flash (Low)',
+    description: 'Gemini 3.5 Flash (Low) · Ultra fast reasoning, basic quality',
+  },
+  {
+    id: 'Gemini 3.1 Pro (High)',
+    label: 'Gemini 3.1 Pro (High)',
+    description: 'Gemini 3.1 Pro (High) · Capability-focused flagship',
+  },
+  {
+    id: 'Gemini 3.1 Pro (Low)',
+    label: 'Gemini 3.1 Pro (Low)',
+    description: 'Gemini 3.1 Pro (Low) · Light version of 3.1 Pro',
+  },
+  {
+    id: 'Claude Sonnet 4.6 (Thinking)',
+    label: 'Claude Sonnet 4.6 (Thinking)',
+    description: 'Claude Sonnet 4.6 (Thinking) · Capable coding agent with thinking capabilities',
+  },
+  {
+    id: 'Claude Opus 4.6 (Thinking)',
+    label: 'Claude Opus 4.6 (Thinking)',
+    description: 'Claude Opus 4.6 (Thinking) · Deep capability agent with thinking capabilities',
+  },
+  {
+    id: 'GPT-OSS 120B (Medium)',
+    label: 'GPT-OSS 120B (Medium)',
+    description: 'GPT-OSS 120B (Medium) · Open-source coding specialist',
+  },
+];
+
+/**
  * Available models (backward compatibility)
  */
 export const AVAILABLE_MODELS = CLAUDE_MODELS;
@@ -412,7 +458,7 @@ export interface ProviderInfo {
 export const AVAILABLE_PROVIDERS: ProviderInfo[] = [
   { id: 'claude', label: 'Claude Code', icon: 'codicon-terminal', enabled: true },
   { id: 'codex', label: 'Codex', icon: 'codicon-terminal', enabled: true },
-  { id: 'gemini', label: 'Gemini Cli', icon: 'codicon-terminal', enabled: false },
+  { id: 'agy', label: 'Antigravity', icon: 'codicon-terminal', enabled: true },
   { id: 'opencode', label: 'OpenCode', icon: 'codicon-terminal', enabled: false },
 ];
 

@@ -28,7 +28,7 @@ import { readStdinData } from './utils/stdin-utils.js';
 import { handleClaudeCommand } from './channels/claude-channel.js';
 import { handleCodexCommand } from './channels/codex-channel.js';
 import { handleAgyCommand } from './channels/agy-channel.js';
-import { getSdkStatus, isClaudeSdkAvailable, isCodexSdkAvailable } from './utils/sdk-loader.js';
+import { getSdkStatus, isAgySdkAvailable, isClaudeSdkAvailable, isCodexSdkAvailable } from './utils/sdk-loader.js';
 import { injectNetworkEnvVars, configureCliIdentity } from './config/api-config.js';
 
 // Sync proxy/TLS settings from ~/.claude/settings.json BEFORE any network
@@ -103,6 +103,14 @@ async function handleSystemCommand(command, args, stdinData) {
       console.log(JSON.stringify({
         success: true,
         available: isCodexSdkAvailable()
+      }));
+      break;
+
+    case 'checkAgySdk':
+      // Check if Agy Python SDK is available
+      console.log(JSON.stringify({
+        success: true,
+        available: isAgySdkAvailable()
       }));
       break;
 

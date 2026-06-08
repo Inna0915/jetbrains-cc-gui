@@ -27,6 +27,10 @@ const SDK_DEFINITIONS = {
     CODEX: {
         id: 'codex-sdk',
         npmPackage: '@openai/codex-sdk'
+    },
+    AGY: {
+        id: 'agy-sdk',
+        pipPackage: 'google-antigravity'
     }
 };
 
@@ -39,6 +43,14 @@ function getPackageDirFromRoot(sdkRootDir, pkgName) {
     // Logic kept consistent with DependencyManager.getPackageDir()
     const parts = pkgName.split('/');
     return join(sdkRootDir, 'node_modules', ...parts);
+}
+
+function getAgyManagedPythonPath(platformName = process.platform) {
+    const venvDir = join(getSdkRootDir(SDK_DEFINITIONS.AGY.id), '.venv');
+    if (platformName === 'win32') {
+        return join(venvDir, 'Scripts', 'python.exe');
+    }
+    return join(venvDir, 'bin', 'python');
 }
 
 function pickExportTarget(exportsField, condition) {
@@ -130,6 +142,21 @@ export function isCodexSdkAvailable() {
     const exists = existsSync(sdkPath);
     console.log('[sdk-loader] isCodexSdkAvailable:', {
         path: sdkPath,
+        exists: exists
+    });
+    return exists;
+}
+
+/**
+ * Check whether the Java-managed Agy Python SDK environment is available.
+ * The Java DependencyManager performs package-level pip inspection; Node only
+ * needs to avoid falsely treating Agy as an NPM SDK.
+ */
+export function isAgySdkAvailable() {
+    const pythonPath = getAgyManagedPythonPath();
+    const exists = existsSync(pythonPath);
+    console.log('[sdk-loader] isAgySdkAvailable:', {
+        path: pythonPath,
         exists: exists
     });
     return exists;
@@ -327,6 +354,7 @@ export function getSdkStatus() {
     // Uses the same path resolution logic as DependencyManager
     const claudeInstalled = isClaudeSdkAvailable();
     const codexInstalled = isCodexSdkAvailable();
+    const agyInstalled = isAgySdkAvailable();
 
     return {
         claude: {
@@ -336,6 +364,12 @@ export function getSdkStatus() {
         codex: {
             installed: codexInstalled,
             path: getPackageDirFromRoot(getSdkRootDir('codex-sdk'), '@openai/codex-sdk')
+        },
+        agy: {
+            installed: agyInstalled,
+            path: getAgyManagedPythonPath(),
+            runtimeType: 'pip',
+            packageName: SDK_DEFINITIONS.AGY.pipPackage
         }
     };
 }
@@ -365,6 +399,13 @@ export function requireSdk(provider) {
         const error = new Error('Codex SDK not installed. Please install via Settings > Dependencies.');
         error.code = 'SDK_NOT_INSTALLED';
         error.provider = 'codex';
+        throw error;
+    }
+
+    if (provider === 'agy' && !isAgySdkAvailable()) {
+        const error = new Error('Agy Python SDK not installed. Please install via Settings > Dependencies.');
+        error.code = 'SDK_NOT_INSTALLED';
+        error.provider = 'agy';
         throw error;
     }
 }

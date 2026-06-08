@@ -110,8 +110,8 @@ export function useMessageSender({
       return true;
     }
 
-    // /plan - switch to plan mode (Claude only; Codex sends as normal text)
-    if (PLAN_COMMANDS.has(command) && currentProvider === 'claude') {
+    // /plan - switch to plan mode (Claude and Agy; Codex sends as normal text)
+    if (PLAN_COMMANDS.has(command) && (currentProvider === 'claude' || currentProvider === 'agy')) {
       if (handleModeSelect) {
         handleModeSelect('plan');
         addToast(t('chat.planModeEnabled', { defaultValue: 'Plan mode enabled' }), 'info');
@@ -299,8 +299,13 @@ export function useMessageSender({
       return;
     }
     if (!currentSdkInstalled) {
+      const providerDisplayName = currentProvider === 'codex'
+        ? 'Codex'
+        : currentProvider === 'agy'
+          ? 'Agy'
+          : 'Claude Code';
       addToast(
-        t('chat.sdkNotInstalled', { provider: currentProvider === 'codex' ? 'Codex' : 'Claude Code' }) + ' ' + t('chat.goInstallSdk'),
+        t('chat.sdkNotInstalled', { provider: providerDisplayName }) + ' ' + t('chat.goInstallSdk'),
         'warning'
       );
       setSettingsInitialTab('dependencies');

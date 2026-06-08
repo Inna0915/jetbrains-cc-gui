@@ -3,7 +3,12 @@ import { useMessageSender } from './useMessageSender';
 import type { UseMessageSenderOptions } from './useMessageSender';
 
 describe('useMessageSender - /context command', () => {
-  const t = ((key: string, opts?: any) => opts?.defaultValue ?? key) as any;
+  const t = ((key: string, opts?: any) => {
+    if (key === 'chat.sdkNotInstalled') {
+      return `${opts?.provider ?? ''} SDK is not installed`;
+    }
+    return opts?.defaultValue ?? key;
+  }) as any;
 
   const createOptions = (overrides: Partial<UseMessageSenderOptions> = {}): UseMessageSenderOptions => ({
     t,
@@ -138,5 +143,47 @@ describe('useMessageSender - /context command', () => {
       expect.any(String),
       'error',
     );
+  });
+
+  it('switches agy into plan mode for /plan', () => {
+    const handleModeSelect = vi.fn();
+    const opts = createOptions({
+      currentProvider: 'agy',
+      handleModeSelect,
+    });
+
+    const { result } = renderHook(() => useMessageSender(opts));
+
+    act(() => {
+      result.current.handleSubmit('/plan');
+    });
+
+    expect(handleModeSelect).toHaveBeenCalledWith('plan');
+  });
+
+  it('uses Agy in the missing SDK install warning', () => {
+    const addToast = vi.fn();
+    const setCurrentView = vi.fn();
+    const setSettingsInitialTab = vi.fn();
+    const opts = createOptions({
+      currentProvider: 'agy',
+      currentSdkInstalled: false,
+      addToast,
+      setCurrentView,
+      setSettingsInitialTab,
+    });
+
+    const { result } = renderHook(() => useMessageSender(opts));
+
+    act(() => {
+      result.current.handleSubmit('hello');
+    });
+
+    expect(addToast).toHaveBeenCalledWith(
+      expect.stringContaining('Agy'),
+      'warning',
+    );
+    expect(setSettingsInitialTab).toHaveBeenCalledWith('dependencies');
+    expect(setCurrentView).toHaveBeenCalledWith('settings');
   });
 });

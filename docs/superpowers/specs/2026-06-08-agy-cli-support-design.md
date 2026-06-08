@@ -49,6 +49,11 @@ Result:
 - Version: `0.1.2`
 - Homepage: `https://github.com/Google-Antigravity/antigravity-sdk-python`
 - Installed successfully on Python `3.11.9`
+- Runner smoke: `agy_sdk_runner.py --version` now prints JSON package/runtime metadata and exits `0`:
+
+```json
+{"package":"google-antigravity","version":"0.1.2","python":"3.11.9","executable":"C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\agy-sdk-real-verify\\Scripts\\python.exe"}
+```
 
 Confirmed API facts:
 
@@ -66,6 +71,7 @@ Confirmed API facts:
 - `policy.ask_user` handler signature is `Callable[[ToolCall], bool | Awaitable[bool]]`.
 - `policy.allow_all()` and `policy.deny_all()` return a single `Policy`, not a list. They must be wrapped as `[policy.allow_all()]` or `[policy.deny_all()]` when passed to `LocalAgentConfig`.
 - `policy.safe_defaults(handler)` returns a list and is the correct basis for the plugin's `default` mode.
+- SDK introspection on the installed package confirmed `BuiltinTools.read_only()` returns `list_directory`, `search_directory`, `find_file`, `view_file`, and `finish`; `policy.safe_defaults(...)` returns six policies; `policy.allow_all()` returns a `Policy`; stream chunk classes are `Text`, `Thought`, `ToolCall`, and `ToolResult`.
 
 Local CLI verification:
 
@@ -325,6 +331,18 @@ cd ai-bridge; node --test services/agy/*.test.mjs
 cd webview; npm test -- --run useMessageSender.context.test.ts useModelProviderState
 .\gradlew.bat buildPlugin -PskipWebview=false
 ```
+
+Implementation verification on June 8, 2026:
+
+- PASS: `python -m unittest ai-bridge/services/agy/agy_sdk_runner_test.py ai-bridge/services/agy/permission_policy_test.py` using the real `google-antigravity` `0.1.2` venv.
+- PASS: `agy_sdk_runner.py --version` with the real SDK venv.
+- PASS: targeted Agy Node tests: `services/agy/message-service.test.mjs`, `utils/sdk-loader.test.mjs`, and `utils/agy-permission-mapper.test.mjs`.
+- PASS: targeted Agy Java tests: `AgySDKBridgeTest`, `SessionSendServiceTest`, `SessionProviderRouterTest`, `AgyMessageHandlerTest`, and `DependencyManagerAgySdkTest`.
+- PASS: webview full test suite, `82` files and `636` tests.
+- PASS: `.\gradlew.bat buildPlugin -PskipWebview=false`; plugin package produced at `build/distributions/idea-claude-code-gui-0.4.4.zip`.
+- Known non-Agy regression: Java full `.\gradlew.bat test -PskipWebview=true` currently fails in `NodeDetectorWslTest` Windows/WSL path assertions. These files are unchanged from `origin/main` in this branch.
+- Known non-Agy regression: full `ai-bridge` `node --test` currently fails in existing Claude tests on Node `24.14.0` due Windows absolute ESM import paths (`ERR_UNSUPPORTED_ESM_URL_SCHEME`) and local Claude model configuration affecting persistent runtime assertions. Targeted Agy bridge tests pass.
+- Authenticated live Antigravity chat remains a manual verification step because it requires user credentials/API configuration.
 
 Manual verification:
 

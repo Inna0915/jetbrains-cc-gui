@@ -28,22 +28,40 @@ public enum SdkDefinition {
         Collections.emptyList(),
         Arrays.asList("0.117.0", "0.116.0", "0.115.0"),
         "Codex AI 提供商所需。"
+    ),
+
+    AGY_SDK(
+        "agy-sdk",
+        "Antigravity Python SDK",
+        "google-antigravity",
+        "latest",
+        RuntimeType.PIP,
+        Collections.emptyList(),
+        Arrays.asList("0.1.2"),
+        "Agy AI 提供商所需，包含 google-antigravity Python SDK。"
     );
 
     private final String id;
     private final String displayName;
-    private final String npmPackage;
+    private final String packageName;
     private final String version;
+    private final RuntimeType runtimeType;
     private final List<String> dependencies;
     private final List<String> fallbackVersions;
     private final String description;
 
-    SdkDefinition(String id, String displayName, String npmPackage, String version,
+    SdkDefinition(String id, String displayName, String packageName, String version,
+                  List<String> dependencies, List<String> fallbackVersions, String description) {
+        this(id, displayName, packageName, version, RuntimeType.NPM, dependencies, fallbackVersions, description);
+    }
+
+    SdkDefinition(String id, String displayName, String packageName, String version, RuntimeType runtimeType,
                   List<String> dependencies, List<String> fallbackVersions, String description) {
         this.id = id;
         this.displayName = displayName;
-        this.npmPackage = npmPackage;
+        this.packageName = packageName;
         this.version = version;
+        this.runtimeType = runtimeType;
         this.dependencies = dependencies;
         this.fallbackVersions = fallbackVersions;
         this.description = description;
@@ -57,12 +75,20 @@ public enum SdkDefinition {
         return displayName;
     }
 
+    public String getPackageName() {
+        return packageName;
+    }
+
     public String getNpmPackage() {
-        return npmPackage;
+        return packageName;
     }
 
     public String getVersion() {
         return version;
+    }
+
+    public RuntimeType getRuntimeType() {
+        return runtimeType;
     }
 
     public List<String> getDependencies() {
@@ -82,7 +108,7 @@ public enum SdkDefinition {
      * For example: @anthropic-ai/claude-agent-sdk@^0.1.76
      */
     public String getFullPackageSpec() {
-        return npmPackage + "@" + version;
+        return packageName + "@" + version;
     }
 
     /**
@@ -118,6 +144,8 @@ public enum SdkDefinition {
             return CLAUDE_SDK;
         } else if ("codex".equalsIgnoreCase(provider)) {
             return CODEX_SDK;
+        } else if ("agy".equalsIgnoreCase(provider)) {
+            return AGY_SDK;
         }
         return null;
     }

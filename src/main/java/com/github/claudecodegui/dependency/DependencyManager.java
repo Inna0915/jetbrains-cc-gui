@@ -45,6 +45,7 @@ public class DependencyManager {
     private final Gson gson;
     private final NodeDetector nodeDetector;
     private final EnvironmentConfigurator envConfigurator;
+    private final PythonDependencyManager pythonDependencyManager;
     /** Caches resolved WSL npm paths keyed by node path. Populated lazily on first lookup. */
     private final Map<String, String> wslNpmPathCache = new ConcurrentHashMap<>();
 
@@ -53,12 +54,20 @@ public class DependencyManager {
         // Use shared NodeDetector instance (singleton pattern)
         this.nodeDetector = NodeDetector.getInstance();
         this.envConfigurator = new EnvironmentConfigurator();
+        this.pythonDependencyManager = new PythonDependencyManager(getDependenciesDir());
     }
 
     public DependencyManager(NodeDetector nodeDetector) {
+        this(nodeDetector, null);
+    }
+
+    DependencyManager(NodeDetector nodeDetector, PythonDependencyManager pythonDependencyManager) {
         this.gson = new GsonBuilder().setPrettyPrinting().create();
         this.nodeDetector = nodeDetector;
         this.envConfigurator = new EnvironmentConfigurator();
+        this.pythonDependencyManager = pythonDependencyManager != null
+                ? pythonDependencyManager
+                : new PythonDependencyManager(getDependenciesDir());
     }
 
     /**
@@ -90,6 +99,9 @@ public class DependencyManager {
         SdkDefinition sdk = SdkDefinition.fromId(sdkId);
         if (sdk == null) {
             return false;
+        }
+        if (sdk.getRuntimeType() == RuntimeType.PIP) {
+            return pythonDependencyManager.isInstalled(sdk);
         }
 
         // Check if the main package exists in node_modules
@@ -158,6 +170,9 @@ public class DependencyManager {
         if (sdk == null || !isInstalled(sdkId)) {
             return null;
         }
+        if (sdk.getRuntimeType() == RuntimeType.PIP) {
+            return pythonDependencyManager.getInstalledVersion(sdk);
+        }
 
         return getInstalledVersionFromPackage(sdkId, sdk.getNpmPackage());
     }
@@ -169,6 +184,9 @@ public class DependencyManager {
         SdkDefinition sdk = SdkDefinition.fromId(sdkId);
         if (sdk == null) {
             return null;
+        }
+        if (sdk.getRuntimeType() == RuntimeType.PIP) {
+            return pythonDependencyManager.getLatestVersion(sdk);
         }
 
         try {
@@ -215,6 +233,9 @@ public class DependencyManager {
         SdkDefinition sdk = SdkDefinition.fromId(sdkId);
         if (sdk == null) {
             return Collections.emptyList();
+        }
+        if (sdk.getRuntimeType() == RuntimeType.PIP) {
+            return pythonDependencyManager.getAvailableVersions(sdk);
         }
 
         try {
@@ -312,6 +333,13 @@ public class DependencyManager {
         SdkDefinition sdk = SdkDefinition.fromId(sdkId);
         if (sdk == null) {
             return InstallResult.failure(sdkId, "Unknown SDK: " + sdkId, "");
+        }
+        if (sdk.getRuntimeType() == RuntimeType.PIP) {
+            InstallResult result = pythonDependencyManager.installSdkSync(sdk, requestedVersion, logCallback);
+            if (result.isSuccess()) {
+                updateManifest(sdkId, result.getInstalledVersion());
+            }
+            return result;
         }
 
         StringBuilder logs = new StringBuilder();
@@ -510,6 +538,15 @@ public class DependencyManager {
      */
     public boolean uninstallSdk(String sdkId) {
         try {
+            SdkDefinition sdk = SdkDefinition.fromId(sdkId);
+            if (sdk != null && sdk.getRuntimeType() == RuntimeType.PIP) {
+                boolean success = pythonDependencyManager.uninstallSdk(sdkId);
+                if (success) {
+                    removeFromManifest(sdkId);
+                }
+                return success;
+            }
+
             Path sdkDir = getSdkDir(sdkId);
             if (!Files.exists(sdkDir)) {
                 return true;
@@ -550,6 +587,8 @@ public class DependencyManager {
             status.addProperty("name", sdk.getDisplayName());
             status.addProperty("description", sdk.getDescription());
             status.addProperty("npmPackage", sdk.getNpmPackage());
+            status.addProperty("packageName", sdk.getPackageName());
+            status.addProperty("runtimeType", sdk.getRuntimeType().name().toLowerCase());
             status.addProperty("installed", installed);
             // Add the status field for frontend consumption
             status.addProperty("status", installed ? "installed" : "not_installed");

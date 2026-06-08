@@ -7,6 +7,7 @@ import com.github.claudecodegui.bridge.NodeDetector;
 import com.github.claudecodegui.dependency.DependencyManager;
 import com.github.claudecodegui.model.NodeDetectionResult;
 import com.github.claudecodegui.dependency.InstallResult;
+import com.github.claudecodegui.dependency.RuntimeType;
 import com.github.claudecodegui.dependency.SdkDefinition;
 import com.github.claudecodegui.dependency.UpdateInfo;
 import com.google.gson.Gson;
@@ -192,8 +193,8 @@ public class DependencyHandler extends BaseMessageHandler {
             // to avoid blocking the CEF IO thread if the cache is cold.
             CompletableFuture.runAsync(() -> {
                 try {
-                    // Check Node.js environment (may involve process I/O on cache miss)
-                    if (!this.dependencyManager.checkNodeEnvironment()) {
+                    // Check Node.js only for NPM SDKs. Python SDKs manage their own runtime.
+                    if (sdk.getRuntimeType() == RuntimeType.NPM && !this.dependencyManager.checkNodeEnvironment()) {
                         JsonObject errorResult = new JsonObject();
                         errorResult.addProperty("success", false);
                         errorResult.addProperty("sdkId", sdkId);
@@ -300,8 +301,8 @@ public class DependencyHandler extends BaseMessageHandler {
 
             CompletableFuture.runAsync(() -> {
                 try {
-                    // Check Node.js environment
-                    if (!this.dependencyManager.checkNodeEnvironment()) {
+                    // Check Node.js only for NPM SDKs. Python SDKs manage their own runtime.
+                    if (sdk.getRuntimeType() == RuntimeType.NPM && !this.dependencyManager.checkNodeEnvironment()) {
                         JsonObject errorResult = new JsonObject();
                         errorResult.addProperty("success", false);
                         errorResult.addProperty("sdkId", sdkId);
@@ -320,7 +321,12 @@ public class DependencyHandler extends BaseMessageHandler {
                         return;
                     }
 
-                    this.sendInstallProgress(sdkId, "Updating SDK with npm install...");
+                    this.sendInstallProgress(
+                        sdkId,
+                        sdk.getRuntimeType() == RuntimeType.PIP
+                            ? "Updating Python SDK with pip install..."
+                            : "Updating SDK with npm install..."
+                    );
                     InstallResult result = this.dependencyManager.installSdkSync(sdkId, requestedVersion, (logLine) -> {
                         this.sendInstallProgress(sdkId, logLine);
                     });

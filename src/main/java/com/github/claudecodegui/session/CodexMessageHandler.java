@@ -22,6 +22,7 @@ public class CodexMessageHandler implements MessageCallback {
      * state.
      */
     private final SessionState state;
+    private final String providerName;
     /**
      * callback handler.
      */
@@ -58,8 +59,13 @@ public class CodexMessageHandler implements MessageCallback {
      * @since 1.0.0
      */
     public CodexMessageHandler(SessionState state, CallbackHandler callbackHandler) {
+        this(state, callbackHandler, "Codex");
+    }
+
+    protected CodexMessageHandler(SessionState state, CallbackHandler callbackHandler, String providerName) {
         this.state = state;
         this.callbackHandler = callbackHandler;
+        this.providerName = providerName;
     }
 
     /**
@@ -75,7 +81,7 @@ public class CodexMessageHandler implements MessageCallback {
         // Codex message-service.js sends:
         // - type='assistant': contains thinking, tool_use, text
         // - type='user': contains tool_result
-        LOG.debug("CodexMessageHandler.onMessage: type=" + type + ", content length=" + (content != null ? content.length() : 0));
+        LOG.debug(providerName + "MessageHandler.onMessage: type=" + type + ", content length=" + (content != null ? content.length() : 0));
 
         if ("assistant".equals(type)) {
             // Handle assistant message (thinking, tool_use, text)
@@ -109,7 +115,7 @@ public class CodexMessageHandler implements MessageCallback {
         } else if ("message_end".equals(type)) {
             handleMessageEnd();
         } else {
-            LOG.debug("CodexMessageHandler: Unhandled message type: " + type);
+            LOG.debug(providerName + "MessageHandler: Unhandled message type: " + type);
         }
     }
 
@@ -156,7 +162,7 @@ public class CodexMessageHandler implements MessageCallback {
         state.updateLastModifiedTime();
 
         if (wasStreaming && !streamEndedBeforeComplete) {
-            LOG.warn("Codex onComplete called without prior stream_end; forcing stream cleanup");
+            LOG.warn(providerName + " onComplete called without prior stream_end; forcing stream cleanup");
             callbackHandler.notifyMessageUpdate(state.getMessages());
             callbackHandler.notifyStreamEnd();
         }
@@ -197,7 +203,7 @@ public class CodexMessageHandler implements MessageCallback {
             }
             callbackHandler.notifyMessageUpdate(state.getMessages());
 
-            LOG.debug("Codex assistant message synchronized with raw JSON");
+            LOG.debug(providerName + " assistant message synchronized with raw JSON");
         } catch (Exception e) {
             LOG.warn("Failed to parse assistant message: " + e.getMessage());
         }
@@ -224,7 +230,7 @@ public class CodexMessageHandler implements MessageCallback {
             state.addMessage(parsed);
             callbackHandler.notifyMessageUpdate(state.getMessages());
 
-            LOG.debug("Codex user message (tool_result) added");
+            LOG.debug(providerName + " user message (tool_result) added");
         } catch (Exception e) {
             LOG.warn("Failed to parse user message: " + e.getMessage());
         }
@@ -240,7 +246,7 @@ public class CodexMessageHandler implements MessageCallback {
         if (threadId != null && !threadId.trim().isEmpty()) {
             state.setSessionId(threadId);
             callbackHandler.notifySessionIdReceived(threadId);
-            LOG.info("Captured Codex thread ID: " + threadId);
+            LOG.info("Captured " + providerName + " session ID: " + threadId);
         }
     }
 
@@ -262,12 +268,12 @@ public class CodexMessageHandler implements MessageCallback {
             boolean updated = attachUsageToLastAssistant(usage);
             if (updated) {
                 callbackHandler.notifyMessageUpdate(state.getMessages());
-                LOG.info("Codex usage applied from result message");
+                LOG.info(providerName + " usage applied from result message");
             } else {
-                LOG.debug("Codex usage received but no assistant message to attach");
+                LOG.debug(providerName + " usage received but no assistant message to attach");
             }
         } catch (Exception e) {
-            LOG.debug("Failed to parse Codex result message: " + e.getMessage());
+            LOG.debug("Failed to parse " + providerName + " result message: " + e.getMessage());
         }
     }
 
@@ -313,12 +319,12 @@ public class CodexMessageHandler implements MessageCallback {
             boolean updated = attachUsageToLastAssistant(usage);
             if (updated) {
                 callbackHandler.notifyMessageUpdate(state.getMessages());
-                LOG.debug("Codex token_count applied: input=" + inputTokens + ", output=" + outputTokens + ", cached=" + cachedInputTokens);
+                LOG.debug(providerName + " token_count applied: input=" + inputTokens + ", output=" + outputTokens + ", cached=" + cachedInputTokens);
             } else {
-                LOG.debug("Codex token_count received but no assistant message to attach");
+                LOG.debug(providerName + " token_count received but no assistant message to attach");
             }
         } catch (Exception e) {
-            LOG.debug("Failed to parse Codex event_msg: " + e.getMessage());
+            LOG.debug("Failed to parse " + providerName + " event_msg: " + e.getMessage());
         }
     }
 
@@ -742,7 +748,7 @@ public class CodexMessageHandler implements MessageCallback {
         streamEndedThisTurn = false;
         resetStreamingAccumulator();
         callbackHandler.notifyStreamStart();
-        LOG.debug("Codex stream started");
+        LOG.debug(providerName + " stream started");
     }
 
     /**
@@ -764,7 +770,7 @@ public class CodexMessageHandler implements MessageCallback {
         state.updateLastModifiedTime();
         resetStreamingAccumulator();
         callbackHandler.notifyStateChange(state.isBusy(), state.isLoading(), state.getError());
-        LOG.debug("Codex stream ended");
+        LOG.debug(providerName + " stream ended");
     }
 
     /**
@@ -773,7 +779,7 @@ public class CodexMessageHandler implements MessageCallback {
      * @since 1.0.0
      */
     private void handleMessageEnd() {
-        LOG.debug("Codex message_end received, deferring stream cleanup to stream_end/onComplete");
+        LOG.debug(providerName + " message_end received, deferring stream cleanup to stream_end/onComplete");
     }
 
     /**

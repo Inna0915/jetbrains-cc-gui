@@ -233,7 +233,7 @@ public class SessionSendService {
             String agentPrompt,
             String effectivePermissionMode
     ) {
-        CodexMessageHandler handler = new CodexMessageHandler(state, callbackFacade.getCallbackHandler());
+        AgyMessageHandler handler = new AgyMessageHandler(state, callbackFacade.getCallbackHandler());
         return agySDKBridge.sendMessage(
                 channelId,
                 input,

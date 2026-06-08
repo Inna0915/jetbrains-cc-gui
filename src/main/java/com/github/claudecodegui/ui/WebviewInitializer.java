@@ -4,6 +4,7 @@ import com.github.claudecodegui.bridge.NodeDetector;
 import com.github.claudecodegui.handler.core.HandlerContext;
 import com.github.claudecodegui.i18n.ClaudeCodeGuiBundle;
 import com.github.claudecodegui.model.NodeDetectionResult;
+import com.github.claudecodegui.provider.agy.AgySDKBridge;
 import com.github.claudecodegui.provider.claude.ClaudeSDKBridge;
 import com.github.claudecodegui.provider.codex.CodexSDKBridge;
 import com.github.claudecodegui.startup.BridgePreloader;
@@ -57,6 +58,7 @@ public class WebviewInitializer {
         Project getProject();
         ClaudeSDKBridge getClaudeSDKBridge();
         CodexSDKBridge getCodexSDKBridge();
+        AgySDKBridge getAgySDKBridge();
         JPanel getMainPanel();
         HtmlLoader getHtmlLoader();
         HandlerContext getHandlerContext();
@@ -101,6 +103,7 @@ public class WebviewInitializer {
 
         ClaudeSDKBridge claudeSDKBridge = host.getClaudeSDKBridge();
         CodexSDKBridge codexSDKBridge = host.getCodexSDKBridge();
+        AgySDKBridge agySDKBridge = host.getAgySDKBridge();
 
         PropertiesComponent props = PropertiesComponent.getInstance();
         String savedNodePath = props.getValue(NODE_PATH_PROPERTY_KEY);
@@ -110,6 +113,9 @@ public class WebviewInitializer {
             String trimmed = savedNodePath.trim();
             claudeSDKBridge.setNodeExecutable(trimmed);
             codexSDKBridge.setNodeExecutable(trimmed);
+            if (agySDKBridge != null) {
+                agySDKBridge.setNodeExecutable(trimmed);
+            }
             nodeResult = claudeSDKBridge.verifyAndCacheNodePath(trimmed);
             if (nodeResult == null || !nodeResult.isFound()) {
                 showInvalidNodePathPanel(trimmed, nodeResult != null ? nodeResult.getErrorMessage() : null);
@@ -121,6 +127,9 @@ public class WebviewInitializer {
                 props.setValue(NODE_PATH_PROPERTY_KEY, nodeResult.getNodePath());
                 claudeSDKBridge.setNodeExecutable(nodeResult.getNodePath());
                 codexSDKBridge.setNodeExecutable(nodeResult.getNodePath());
+                if (agySDKBridge != null) {
+                    agySDKBridge.setNodeExecutable(nodeResult.getNodePath());
+                }
                 claudeSDKBridge.verifyAndCacheNodePath(nodeResult.getNodePath());
             }
         }
@@ -524,6 +533,7 @@ public class WebviewInitializer {
     public void handleNodePathSave(String manualPath) {
         ClaudeSDKBridge claudeSDKBridge = this.host.getClaudeSDKBridge();
         CodexSDKBridge codexSDKBridge = this.host.getCodexSDKBridge();
+        AgySDKBridge agySDKBridge = this.host.getAgySDKBridge();
         JPanel mainPanel = this.host.getMainPanel();
 
         try {
@@ -534,6 +544,9 @@ public class WebviewInitializer {
                 props.unsetValue(NODE_PATH_PROPERTY_KEY);
                 claudeSDKBridge.setNodeExecutable(null);
                 codexSDKBridge.setNodeExecutable(null);
+                if (agySDKBridge != null) {
+                    agySDKBridge.setNodeExecutable(null);
+                }
                 LOG.info("Cleared manual Node.js path, triggering auto-detection");
 
                 NodeDetectionResult detected = claudeSDKBridge.detectNodeWithDetails();
@@ -542,6 +555,9 @@ public class WebviewInitializer {
                     props.setValue(NODE_PATH_PROPERTY_KEY, detectedPath);
                     claudeSDKBridge.verifyAndCacheNodePath(detectedPath);
                     codexSDKBridge.setNodeExecutable(detectedPath);
+                    if (agySDKBridge != null) {
+                        agySDKBridge.setNodeExecutable(detectedPath);
+                    }
                     LOG.info("Auto-detected and saved Node.js path: " + detectedPath);
                 }
             } else {
@@ -552,6 +568,9 @@ public class WebviewInitializer {
                     props.setValue(NODE_PATH_PROPERTY_KEY, manualPath);
                     claudeSDKBridge.setNodeExecutable(manualPath);
                     codexSDKBridge.setNodeExecutable(manualPath);
+                    if (agySDKBridge != null) {
+                        agySDKBridge.setNodeExecutable(manualPath);
+                    }
                     LOG.info("Saved manual Node.js path: " + manualPath);
                 } else {
                     // Verification failed, show error and don't save invalid path

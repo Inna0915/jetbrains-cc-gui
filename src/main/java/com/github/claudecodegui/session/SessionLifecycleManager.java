@@ -7,6 +7,7 @@ import com.github.claudecodegui.handler.core.HandlerContext;
 import com.github.claudecodegui.handler.SettingsHandler;
 import com.github.claudecodegui.provider.claude.ClaudeSDKBridge;
 import com.github.claudecodegui.provider.codex.CodexSDKBridge;
+import com.github.claudecodegui.provider.agy.AgySDKBridge;
 import com.github.claudecodegui.skill.SlashCommandRegistry;
 import com.github.claudecodegui.util.JsUtils;
 import com.github.claudecodegui.util.PlatformUtils;
@@ -40,6 +41,8 @@ public class SessionLifecycleManager {
         ClaudeSDKBridge getClaudeSDKBridge();
 
         CodexSDKBridge getCodexSDKBridge();
+
+        AgySDKBridge getAgySDKBridge();
 
         ClaudeSession getSession();
 
@@ -243,7 +246,7 @@ public class SessionLifecycleManager {
             }
 
             ClaudeSession newSession = new ClaudeSession(
-                    host.getProject(), host.getClaudeSDKBridge(), host.getCodexSDKBridge());
+                    host.getProject(), host.getClaudeSDKBridge(), host.getCodexSDKBridge(), host.getAgySDKBridge());
             newSession.setPermissionMode(previousPermissionMode);
             newSession.setProvider(provider != null && !provider.trim().isEmpty() ? provider : previousProvider);
             newSession.setModel(previousModel);
@@ -433,7 +436,7 @@ public class SessionLifecycleManager {
     }
 
     private ClaudeSession createDefaultSession() {
-        return new ClaudeSession(host.getProject(), host.getClaudeSDKBridge(), host.getCodexSDKBridge());
+        return new ClaudeSession(host.getProject(), host.getClaudeSDKBridge(), host.getCodexSDKBridge(), host.getAgySDKBridge());
     }
 
     private void completeNewSessionBootstrap(ClaudeSession newSession, String workingDirectory, String successLogPrefix) {

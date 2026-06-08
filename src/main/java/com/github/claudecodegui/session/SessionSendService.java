@@ -3,6 +3,7 @@ package com.github.claudecodegui.session;
 import com.github.claudecodegui.i18n.ClaudeCodeGuiBundle;
 import com.github.claudecodegui.settings.CodemossSettingsService;
 import com.github.claudecodegui.notifications.ClaudeNotifier;
+import com.github.claudecodegui.provider.agy.AgySDKBridge;
 import com.github.claudecodegui.provider.claude.ClaudeSDKBridge;
 import com.github.claudecodegui.provider.codex.CodexSDKBridge;
 import com.google.gson.Gson;
@@ -28,6 +29,7 @@ public class SessionSendService {
     private final Gson gson;
     private final ClaudeSDKBridge claudeSDKBridge;
     private final CodexSDKBridge codexSDKBridge;
+    private final AgySDKBridge agySDKBridge;
     private final SessionContextService contextService;
 
     public SessionSendService(
@@ -41,6 +43,22 @@ public class SessionSendService {
             CodexSDKBridge codexSDKBridge,
             SessionContextService contextService
     ) {
+        this(project, state, callbackFacade, messageParser, messageMerger, gson,
+                claudeSDKBridge, codexSDKBridge, null, contextService);
+    }
+
+    public SessionSendService(
+            Project project,
+            SessionState state,
+            SessionCallbackFacade callbackFacade,
+            MessageParser messageParser,
+            MessageMerger messageMerger,
+            Gson gson,
+            ClaudeSDKBridge claudeSDKBridge,
+            CodexSDKBridge codexSDKBridge,
+            AgySDKBridge agySDKBridge,
+            SessionContextService contextService
+    ) {
         this.project = project;
         this.state = state;
         this.callbackFacade = callbackFacade;
@@ -49,6 +67,7 @@ public class SessionSendService {
         this.gson = gson;
         this.claudeSDKBridge = claudeSDKBridge;
         this.codexSDKBridge = codexSDKBridge;
+        this.agySDKBridge = agySDKBridge;
         this.contextService = contextService;
     }
 
@@ -121,6 +140,9 @@ public class SessionSendService {
                     fileTagPaths,
                     effectivePermissionMode
             );
+        }
+        if ("agy".equals(currentProvider) && agySDKBridge != null) {
+            return sendToAgy(channelId, input, attachments, agentPrompt, effectivePermissionMode);
         }
 
         return sendToClaude(channelId, input, attachments, openedFilesJson, agentPrompt, effectivePermissionMode);
@@ -200,6 +222,27 @@ public class SessionSendService {
                 state.getModel(),
                 agentPrompt,
                 state.getReasoningEffort(),
+                handler
+        ).thenApply(result -> null);
+    }
+
+    private CompletableFuture<Void> sendToAgy(
+            String channelId,
+            String input,
+            List<ClaudeSession.Attachment> attachments,
+            String agentPrompt,
+            String effectivePermissionMode
+    ) {
+        CodexMessageHandler handler = new CodexMessageHandler(state, callbackFacade.getCallbackHandler());
+        return agySDKBridge.sendMessage(
+                channelId,
+                input,
+                state.getSessionId(),
+                state.getCwd(),
+                attachments,
+                effectivePermissionMode,
+                state.getModel(),
+                agentPrompt,
                 handler
         ).thenApply(result -> null);
     }

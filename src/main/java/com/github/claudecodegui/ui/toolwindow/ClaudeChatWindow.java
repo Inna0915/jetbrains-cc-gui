@@ -6,6 +6,7 @@ import com.github.claudecodegui.handler.history.HistoryHandler;
 import com.github.claudecodegui.handler.core.MessageDispatcher;
 import com.github.claudecodegui.handler.PermissionHandler;
 import com.github.claudecodegui.permission.PermissionService;
+import com.github.claudecodegui.provider.agy.AgySDKBridge;
 import com.github.claudecodegui.provider.claude.ClaudeSDKBridge;
 import com.github.claudecodegui.provider.codex.CodexSDKBridge;
 import com.github.claudecodegui.provider.common.DaemonBridge;
@@ -49,6 +50,7 @@ public class ClaudeChatWindow {
     private final JPanel mainPanel;
     private final ClaudeSDKBridge claudeSDKBridge;
     private final CodexSDKBridge codexSDKBridge;
+    private final AgySDKBridge agySDKBridge;
     private final Project project;
     private final CodemossSettingsService settingsService;
     private final HtmlLoader htmlLoader;
@@ -92,6 +94,7 @@ public class ClaudeChatWindow {
         this.project = project;
         this.claudeSDKBridge = new ClaudeSDKBridge();
         this.codexSDKBridge = new CodexSDKBridge();
+        this.agySDKBridge = new AgySDKBridge();
         this.settingsService = new CodemossSettingsService();
         this.htmlLoader = new HtmlLoader(getClass());
         this.mainPanel = new JPanel(new BorderLayout());
@@ -129,7 +132,7 @@ public class ClaudeChatWindow {
                 () -> streamCoalescer.isStreamActive()
         );
 
-        this.session = new ClaudeSession(project, claudeSDKBridge, codexSDKBridge);
+        this.session = new ClaudeSession(project, claudeSDKBridge, codexSDKBridge, agySDKBridge);
 
         this.chatWindowDelegate = new ChatWindowDelegate(createDelegateHost());
         chatWindowDelegate.loadPermissionModeFromSettings();
@@ -152,6 +155,11 @@ public class ClaudeChatWindow {
             @Override
             public CodexSDKBridge getCodexSDKBridge() {
                 return codexSDKBridge;
+            }
+
+            @Override
+            public AgySDKBridge getAgySDKBridge() {
+                return agySDKBridge;
             }
 
             @Override
@@ -321,6 +329,10 @@ public class ClaudeChatWindow {
 
     public CodexSDKBridge getCodexSDKBridge() {
         return codexSDKBridge;
+    }
+
+    public AgySDKBridge getAgySDKBridge() {
+        return agySDKBridge;
     }
 
     /**
@@ -764,6 +776,18 @@ public class ClaudeChatWindow {
         }
 
         try {
+            if (agySDKBridge != null) {
+                int activeCount = agySDKBridge.getActiveProcessCount();
+                if (activeCount > 0) {
+                    LOG.info("Cleaning up " + activeCount + " active Agy process(es)...");
+                }
+                agySDKBridge.cleanupAllProcesses();
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to clean up Agy processes: " + e.getMessage());
+        }
+
+        try {
             if (browser != null) {
                 browser.dispose();
                 browser = null;
@@ -796,6 +820,11 @@ public class ClaudeChatWindow {
             @Override
             public CodexSDKBridge getCodexSDKBridge() {
                 return codexSDKBridge;
+            }
+
+            @Override
+            public AgySDKBridge getAgySDKBridge() {
+                return agySDKBridge;
             }
 
             @Override
@@ -860,6 +889,11 @@ public class ClaudeChatWindow {
             @Override
             public CodexSDKBridge getCodexSDKBridge() {
                 return codexSDKBridge;
+            }
+
+            @Override
+            public AgySDKBridge getAgySDKBridge() {
+                return agySDKBridge;
             }
 
             @Override

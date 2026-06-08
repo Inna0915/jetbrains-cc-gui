@@ -30,9 +30,10 @@ const AddModelDialogWrapper = ({
   onClose: () => void;
   currentProvider: string;
 }) => {
-  const storageKey = currentProvider === 'codex'
-    ? STORAGE_KEYS.CODEX_CUSTOM_MODELS
-    : STORAGE_KEYS.CLAUDE_CUSTOM_MODELS;
+  const storageKey =
+    currentProvider === 'codex' ? STORAGE_KEYS.CODEX_CUSTOM_MODELS :
+      currentProvider === 'agy' ? STORAGE_KEYS.AGY_CUSTOM_MODELS :
+        STORAGE_KEYS.CLAUDE_CUSTOM_MODELS;
   const { models, updateModels } = usePluginModels(storageKey);
   return (
     <CustomModelDialog

@@ -13,6 +13,8 @@ const NONE_STYLE: React.CSSProperties = { display: 'none' };
 const ICON_14_STYLE: React.CSSProperties = { fontSize: 14 };
 const FLEX_1_STYLE: React.CSSProperties = { flex: 1 };
 
+type ProviderTab = 'claude' | 'codex' | 'agy';
+
 interface ProviderTabSectionProps {
   currentProvider: 'claude' | 'codex' | string;
   // Claude provider props
@@ -53,21 +55,22 @@ const ProviderTabSection = ({
 }: ProviderTabSectionProps) => {
   const { t } = useTranslation();
 
-  const [activeTab, setActiveTab] = useState<'claude' | 'codex'>(
-    () => currentProvider === 'codex' ? 'codex' : 'claude'
+  const [activeTab, setActiveTab] = useState<ProviderTab>(
+    () => currentProvider === 'codex' || currentProvider === 'agy' ? currentProvider : 'claude'
   );
 
   // Plugin-level custom model management
   const claudeModels = usePluginModels(STORAGE_KEYS.CLAUDE_CUSTOM_MODELS);
   const codexModels = usePluginModels(STORAGE_KEYS.CODEX_CUSTOM_MODELS);
+  const agyModels = usePluginModels(STORAGE_KEYS.AGY_CUSTOM_MODELS);
 
   // Dialog state
   const [modelDialogOpen, setModelDialogOpen] = useState(false);
   const [modelDialogAddMode, setModelDialogAddMode] = useState(false);
   // Which plugin's models the dialog is editing
-  const [dialogTarget, setDialogTarget] = useState<'claude' | 'codex'>('claude');
+  const [dialogTarget, setDialogTarget] = useState<ProviderTab>('claude');
 
-  const openModelDialog = useCallback((target: 'claude' | 'codex', addMode = false) => {
+  const openModelDialog = useCallback((target: ProviderTab, addMode = false) => {
     setDialogTarget(target);
     setModelDialogAddMode(addMode);
     setModelDialogOpen(true);
@@ -78,7 +81,10 @@ const ProviderTabSection = ({
     setModelDialogAddMode(false);
   }, []);
 
-  const activeModels = dialogTarget === 'claude' ? claudeModels : codexModels;
+  const activeModels =
+    dialogTarget === 'codex' ? codexModels :
+      dialogTarget === 'agy' ? agyModels :
+        claudeModels;
 
   return (
     <div className={styles.providerTabSection}>
@@ -105,6 +111,16 @@ const ProviderTabSection = ({
         >
           <span className="codicon codicon-terminal" aria-hidden="true" />
           {t('settings.providerTab.codex')}
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeTab === 'agy'}
+          aria-controls="panel-agy-providers"
+          className={`${styles.tabBtn} ${activeTab === 'agy' ? styles.active : ''}`}
+          onClick={() => setActiveTab('agy')}
+        >
+          <span className="codicon codicon-terminal" aria-hidden="true" />
+          {t('settings.providerTab.agy')}
         </button>
       </div>
 
@@ -177,6 +193,31 @@ const ProviderTabSection = ({
           onRevokeCodexLocalConfigAuthorization={onRevokeCodexLocalConfigAuthorization}
           showHeader={false}
         />
+      </div>
+
+      <div id="panel-agy-providers" role="tabpanel" style={activeTab === 'agy' ? BLOCK_STYLE : NONE_STYLE}>
+        <div
+          className={styles.pluginModelsRow}
+          onClick={() => openModelDialog('agy')}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openModelDialog('agy'); }}
+        >
+          <span className="codicon codicon-symbol-misc" style={ICON_14_STYLE} />
+          <span className={styles.pluginModelsLabel}>
+            {t('settings.pluginModels.title')}
+          </span>
+          {agyModels.models.length > 0 && (
+            <span className={styles.pluginModelsBadge}>{agyModels.models.length}</span>
+          )}
+          <span style={FLEX_1_STYLE} />
+          <button
+            className={styles.pluginModelsManageBtn}
+            onClick={(e) => { e.stopPropagation(); openModelDialog('agy'); }}
+          >
+            {t('settings.pluginModels.manage')}
+          </button>
+        </div>
       </div>
 
       {/* Shared model management dialog */}

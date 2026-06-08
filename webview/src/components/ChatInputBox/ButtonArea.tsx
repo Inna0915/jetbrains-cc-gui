@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ButtonAreaProps, ModelInfo, PermissionMode, ReasoningEffort } from './types';
 import { ConfigSelect, ModelSelect, ModeSelect, ProviderSelect, ReasoningSelect } from './selectors';
-import { CLAUDE_MODELS, CODEX_MODELS } from './types';
+import { AGY_MODELS, CLAUDE_MODELS, CODEX_MODELS } from './types';
 import { STORAGE_KEYS, validateCodexCustomModels } from '../../types/provider';
 import type { CodexCustomModel } from '../../types/provider';
 import { readClaudeModelMapping } from '../../utils/claudeModelMapping';
@@ -22,6 +22,31 @@ function getCustomCodexModels(): ModelInfo[] {
     }
     const parsed = JSON.parse(stored);
     // Use runtime type validation
+    const validModels = validateCodexCustomModels(parsed);
+    return validModels.map(m => ({
+      id: m.id,
+      label: m.label || m.id,
+      description: m.description,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Get custom Agy model list from localStorage
+ * Uses runtime type validation for data safety
+ */
+function getCustomAgyModels(): ModelInfo[] {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return [];
+  }
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEYS.AGY_CUSTOM_MODELS);
+    if (!stored) {
+      return [];
+    }
+    const parsed = JSON.parse(stored);
     const validModels = validateCodexCustomModels(parsed);
     return validModels.map(m => ({
       id: m.id,
@@ -103,14 +128,14 @@ export const ButtonArea = ({
   // Listen for localStorage changes (cross-tab sync + same-tab custom events)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEYS.CODEX_CUSTOM_MODELS || e.key === STORAGE_KEYS.CLAUDE_MODEL_MAPPING || e.key === STORAGE_KEYS.CLAUDE_CUSTOM_MODELS) {
+      if (e.key === STORAGE_KEYS.CODEX_CUSTOM_MODELS || e.key === STORAGE_KEYS.AGY_CUSTOM_MODELS || e.key === STORAGE_KEYS.CLAUDE_MODEL_MAPPING || e.key === STORAGE_KEYS.CLAUDE_CUSTOM_MODELS) {
         setCustomModelsVersion(v => v + 1);
       }
     };
 
     // Listen for custom events (localStorage changes within the same tab)
     const handleCustomStorageChange = (e: CustomEvent<{ key: string }>) => {
-      if (e.detail.key === STORAGE_KEYS.CODEX_CUSTOM_MODELS || e.detail.key === STORAGE_KEYS.CLAUDE_MODEL_MAPPING || e.detail.key === STORAGE_KEYS.CLAUDE_CUSTOM_MODELS) {
+      if (e.detail.key === STORAGE_KEYS.CODEX_CUSTOM_MODELS || e.detail.key === STORAGE_KEYS.AGY_CUSTOM_MODELS || e.detail.key === STORAGE_KEYS.CLAUDE_MODEL_MAPPING || e.detail.key === STORAGE_KEYS.CLAUDE_CUSTOM_MODELS) {
         setCustomModelsVersion(v => v + 1);
       }
     };
@@ -162,6 +187,15 @@ export const ButtonArea = ({
       // Filter out built-in models that duplicate custom models
       const customIds = new Set(customModels.map(m => m.id));
       const filteredBuiltIn = CODEX_MODELS.filter(m => !customIds.has(m.id));
+      return [...customModels, ...filteredBuiltIn];
+    }
+    if (currentProvider === 'agy') {
+      const customModels = getCustomAgyModels();
+      if (customModels.length === 0) {
+        return AGY_MODELS;
+      }
+      const customIds = new Set(customModels.map(m => m.id));
+      const filteredBuiltIn = AGY_MODELS.filter(m => !customIds.has(m.id));
       return [...customModels, ...filteredBuiltIn];
     }
     if (typeof window === 'undefined' || !window.localStorage) {

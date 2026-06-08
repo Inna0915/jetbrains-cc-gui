@@ -306,7 +306,8 @@
     },
     "providerTab": {
       "claude": "Claude Code",
-      "codex": "Codex"
+      "codex": "Codex",
+      "agy": "Agy"
     },
     "pluginModels": {
       "title": "Modelos Personalizados",

@@ -113,6 +113,43 @@ describe('useSubmitHandler', () => {
     expect(onInstallSdk).toHaveBeenCalled();
   });
 
+  it('uses Agy in the missing SDK install toast', () => {
+    const addToast = vi.fn();
+
+    const { result } = renderHook(() =>
+      useSubmitHandler({
+        getTextContent: () => 'hello',
+        invalidateCache: vi.fn(),
+        attachments: [],
+        isLoading: false,
+        sdkStatusLoading: false,
+        sdkInstalled: false,
+        currentProvider: 'agy',
+        clearInput: vi.fn(),
+        cancelPendingInput: vi.fn(),
+        externalAttachments: undefined,
+        setInternalAttachments: vi.fn(),
+        fileCompletion: { close: vi.fn() },
+        commandCompletion: { close: vi.fn() },
+        agentCompletion: { close: vi.fn() },
+        promptCompletion: { close: vi.fn() },
+        dollarCommandCompletion: { close: vi.fn() },
+        recordInputHistory: vi.fn(),
+        onSubmit: vi.fn(),
+        addToast,
+        t: (key, options) => key === 'chat.sdkNotInstalled'
+          ? `${options?.provider ?? ''} SDK is not installed`
+          : key,
+      })
+    );
+
+    result.current();
+    expect(addToast).toHaveBeenCalledWith(
+      expect.stringContaining('Agy'),
+      'warning',
+    );
+  });
+
   it('submits content, closes completions, records history, and clears input', () => {
     vi.useFakeTimers();
     const clearInput = vi.fn();

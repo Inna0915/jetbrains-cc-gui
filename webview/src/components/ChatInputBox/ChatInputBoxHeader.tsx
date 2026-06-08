@@ -3,6 +3,7 @@ import type { Attachment, SelectedAgent, QueuedMessage } from './types.js';
 import { AttachmentList } from './AttachmentList.js';
 import { ContextBar } from './ContextBar.js';
 import { MessageQueue } from './MessageQueue.js';
+import { getProviderDisplayName } from '../../utils/providerDisplayName.js';
 
 export function ChatInputBoxHeader({
   sdkStatusLoading,
@@ -90,7 +91,7 @@ export function ChatInputBoxHeader({
             {sdkStatusLoading
               ? t('chat.sdkStatusLoading')
               : t('chat.sdkNotInstalled', {
-                  provider: currentProvider === 'codex' ? 'Codex' : 'Claude Code',
+                  provider: getProviderDisplayName(currentProvider),
                 })}
           </span>
           {!sdkStatusLoading && (
@@ -143,4 +144,3 @@ export function ChatInputBoxHeader({
     </>
   );
 }
-

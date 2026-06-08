@@ -257,7 +257,8 @@
     "providersDesc": "Gestionar configuración de proveedores de API Claude y Codex, cambiar entre diferentes proveedores de servicio API",
     "providerTab": {
       "claude": "Claude Code",
-      "codex": "Codex"
+      "codex": "Codex",
+      "agy": "Agy"
     },
     "pluginModels": {
       "title": "Modelos personalizados",

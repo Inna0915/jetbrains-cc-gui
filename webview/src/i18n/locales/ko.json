@@ -279,7 +279,8 @@
     "providersDesc": "Claude와 Codex API 제공자 설정을 관리하고 다른 API 서비스 제공자 간 전환",
     "providerTab": {
       "claude": "Claude Code",
-      "codex": "Codex"
+      "codex": "Codex",
+      "agy": "Agy"
     },
     "pluginModels": {
       "title": "사용자 지정 모델",

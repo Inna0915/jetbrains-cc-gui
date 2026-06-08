@@ -39,6 +39,8 @@ export function isSpecialProviderId(id: string): boolean {
 export const STORAGE_KEYS = {
   /** Custom Codex model list */
   CODEX_CUSTOM_MODELS: 'codex-custom-models',
+  /** Custom Agy model list */
+  AGY_CUSTOM_MODELS: 'agy-custom-models',
   /** Claude model mapping configuration */
   CLAUDE_MODEL_MAPPING: 'claude-model-mapping',
   /** Custom Claude model list */

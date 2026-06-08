@@ -257,7 +257,8 @@
     "providersDesc": "Управление конфигурациями API-провайдеров Claude и Codex и переключение между ними",
     "providerTab": {
       "claude": "Claude Code",
-      "codex": "Codex"
+      "codex": "Codex",
+      "agy": "Agy"
     },
     "pluginModels": {
       "title": "Пользовательские модели",

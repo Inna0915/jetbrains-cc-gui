@@ -1,6 +1,7 @@
 import { useCallback, type RefObject } from 'react';
 import type { TFunction } from 'i18next';
 import { sendBridgeEvent } from '../utils/bridge';
+import { getProviderDisplayName } from '../utils/providerDisplayName';
 import type { ClaudeContentBlock, ClaudeMessage } from '../types';
 import { apply1MContextSuffix } from '../components/ChatInputBox/types';
 import type { Attachment, ChatInputBoxHandle, PermissionMode, SelectedAgent } from '../components/ChatInputBox/types';
@@ -299,13 +300,8 @@ export function useMessageSender({
       return;
     }
     if (!currentSdkInstalled) {
-      const providerDisplayName = currentProvider === 'codex'
-        ? 'Codex'
-        : currentProvider === 'agy'
-          ? 'Agy'
-          : 'Claude Code';
       addToast(
-        t('chat.sdkNotInstalled', { provider: providerDisplayName }) + ' ' + t('chat.goInstallSdk'),
+        t('chat.sdkNotInstalled', { provider: getProviderDisplayName(currentProvider) }) + ' ' + t('chat.goInstallSdk'),
         'warning'
       );
       setSettingsInitialTab('dependencies');

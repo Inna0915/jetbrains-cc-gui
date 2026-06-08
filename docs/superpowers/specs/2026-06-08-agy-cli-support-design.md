@@ -338,10 +338,12 @@ Implementation verification on June 8, 2026:
 - PASS: `agy_sdk_runner.py --version` with the real SDK venv.
 - PASS: targeted Agy Node tests: `services/agy/message-service.test.mjs`, `utils/sdk-loader.test.mjs`, and `utils/agy-permission-mapper.test.mjs`.
 - PASS: targeted Agy Java tests: `AgySDKBridgeTest`, `SessionSendServiceTest`, `SessionProviderRouterTest`, `AgyMessageHandlerTest`, and `DependencyManagerAgySdkTest`.
+- PASS: Java full test suite, `.\gradlew.bat test -PskipWebview=true`.
+- PASS: Node bridge full test suite, `cd ai-bridge; node --test` with `155` tests.
 - PASS: webview full test suite, `82` files and `636` tests.
 - PASS: `.\gradlew.bat buildPlugin -PskipWebview=false`; plugin package produced at `build/distributions/idea-claude-code-gui-0.4.4.zip`.
-- Known non-Agy regression: Java full `.\gradlew.bat test -PskipWebview=true` currently fails in `NodeDetectorWslTest` Windows/WSL path assertions. These files are unchanged from `origin/main` in this branch.
-- Known non-Agy regression: full `ai-bridge` `node --test` currently fails in existing Claude tests on Node `24.14.0` due Windows absolute ESM import paths (`ERR_UNSUPPORTED_ESM_URL_SCHEME`) and local Claude model configuration affecting persistent runtime assertions. Targeted Agy bridge tests pass.
+- FIXED: Java `NodeDetectorWslTest` now accounts for Unix-style WSL paths on Windows while keeping non-WSL command coverage.
+- FIXED: Node bridge tests now isolate Windows ESM import paths and local Claude provider/model settings from the developer machine.
 - Authenticated live Antigravity chat remains a manual verification step because it requires user credentials/API configuration.
 
 Manual verification:

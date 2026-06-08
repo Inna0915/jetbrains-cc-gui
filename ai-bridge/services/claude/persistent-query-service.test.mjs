@@ -1,7 +1,62 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
-import { __testing } from './persistent-query-service.js';
+const originalEnv = {
+  HOME: process.env.HOME,
+  USERPROFILE: process.env.USERPROFILE,
+  ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
+  ANTHROPIC_DEFAULT_SONNET_MODEL: process.env.ANTHROPIC_DEFAULT_SONNET_MODEL,
+  ANTHROPIC_DEFAULT_OPUS_MODEL: process.env.ANTHROPIC_DEFAULT_OPUS_MODEL,
+  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+  ANTHROPIC_AUTH_TOKEN: process.env.ANTHROPIC_AUTH_TOKEN,
+  ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL,
+  ANTHROPIC_API_URL: process.env.ANTHROPIC_API_URL,
+  MAX_THINKING_TOKENS: process.env.MAX_THINKING_TOKENS,
+};
+const isolatedHome = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-gui-persistent-'));
+process.env.HOME = isolatedHome;
+process.env.USERPROFILE = isolatedHome;
+
+const { __testing } = await import('./persistent-query-service.js');
+
+function restoreEnvValue(key, value) {
+  if (value === undefined) {
+    delete process.env[key];
+  } else {
+    process.env[key] = value;
+  }
+}
+
+function resetRuntimeEnv() {
+  for (const key of [
+    'ANTHROPIC_MODEL',
+    'ANTHROPIC_DEFAULT_SONNET_MODEL',
+    'ANTHROPIC_DEFAULT_OPUS_MODEL',
+    'ANTHROPIC_API_KEY',
+    'ANTHROPIC_AUTH_TOKEN',
+    'ANTHROPIC_BASE_URL',
+    'ANTHROPIC_API_URL',
+    'MAX_THINKING_TOKENS',
+  ]) {
+    delete process.env[key];
+  }
+}
+
+function writeIsolatedClaudeConfig(settings = { env: {} }) {
+  const codemossDir = path.join(isolatedHome, '.codemoss');
+  const claudeDir = path.join(isolatedHome, '.claude');
+  fs.mkdirSync(codemossDir, { recursive: true });
+  fs.mkdirSync(claudeDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(codemossDir, 'config.json'),
+    JSON.stringify({ claude: { current: '__cli_login__', providers: {} } }),
+    'utf8',
+  );
+  fs.writeFileSync(path.join(claudeDir, 'settings.json'), JSON.stringify(settings), 'utf8');
+}
 
 /**
  * Create a Promise that can be manually resolved.
@@ -78,10 +133,17 @@ function createSequencedQueryFactory(steps) {
 
 test.beforeEach(async () => {
   await __testing.resetState();
+  process.env.HOME = isolatedHome;
+  process.env.USERPROFILE = isolatedHome;
+  resetRuntimeEnv();
+  writeIsolatedClaudeConfig();
 });
 
 test.after(async () => {
   await __testing.resetState();
+  for (const [key, value] of Object.entries(originalEnv)) {
+    restoreEnvValue(key, value);
+  }
 });
 
 test('reasoningEffort is passed as SDK effort and disables fixed thinking tokens', async () => {

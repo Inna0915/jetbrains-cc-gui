@@ -89,11 +89,28 @@ public class NodeDetectorWslTest {
     @Test
     public void buildNodeScriptCommand_nonWslPath_returnsNodeAndScript() {
         List<String> cmd = NodeDetector.buildNodeScriptCommand(
-                "/usr/local/bin/node", "/path/to/script.js");
+                "node", "/path/to/script.js");
         assertNotNull(cmd);
         assertEquals(2, cmd.size());
-        assertEquals("/usr/local/bin/node", cmd.get(0));
+        assertEquals("node", cmd.get(0));
         assertEquals("/path/to/script.js", cmd.get(1));
+    }
+
+    @Test
+    public void buildNodeScriptCommand_unixStylePath_usesWslOnlyOnWindows() {
+        List<String> cmd = NodeDetector.buildNodeScriptCommand(
+                "/usr/local/bin/node", "C:\\Users\\foo\\script.js");
+        assertNotNull(cmd);
+        if (NodeDetector.isWslPath("/usr/local/bin/node")) {
+            assertEquals(3, cmd.size());
+            assertEquals("wsl", cmd.get(0));
+            assertEquals("/usr/local/bin/node", cmd.get(1));
+            assertEquals("/mnt/c/Users/foo/script.js", cmd.get(2));
+        } else {
+            assertEquals(2, cmd.size());
+            assertEquals("/usr/local/bin/node", cmd.get(0));
+            assertEquals("C:\\Users\\foo\\script.js", cmd.get(1));
+        }
     }
 
     @Test
@@ -122,12 +139,31 @@ public class NodeDetectorWslTest {
     @Test
     public void buildNodeInlineCommand_nonWslPath_returnsNodeEvalScript() {
         List<String> cmd = NodeDetector.buildNodeInlineCommand(
-                "/usr/local/bin/node", "console.log('hi');");
+                "node", "console.log('hi');");
         assertNotNull(cmd);
         assertEquals(3, cmd.size());
-        assertEquals("/usr/local/bin/node", cmd.get(0));
+        assertEquals("node", cmd.get(0));
         assertEquals("-e", cmd.get(1));
         assertEquals("console.log('hi');", cmd.get(2));
+    }
+
+    @Test
+    public void buildNodeInlineCommand_unixStylePath_usesWslOnlyOnWindows() {
+        List<String> cmd = NodeDetector.buildNodeInlineCommand(
+                "/usr/local/bin/node", "console.log('hi');");
+        assertNotNull(cmd);
+        if (NodeDetector.isWslPath("/usr/local/bin/node")) {
+            assertEquals(4, cmd.size());
+            assertEquals("wsl", cmd.get(0));
+            assertEquals("/usr/local/bin/node", cmd.get(1));
+            assertEquals("-e", cmd.get(2));
+            assertEquals("console.log('hi');", cmd.get(3));
+        } else {
+            assertEquals(3, cmd.size());
+            assertEquals("/usr/local/bin/node", cmd.get(0));
+            assertEquals("-e", cmd.get(1));
+            assertEquals("console.log('hi');", cmd.get(2));
+        }
     }
 
     @Test

@@ -5,7 +5,24 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-const API_CONFIG_MODULE = path.resolve('ai-bridge/config/api-config.js');
+const API_CONFIG_MODULE = new URL('./api-config.js', import.meta.url).href;
+
+function buildChildEnv(homeDir) {
+  const env = {
+    ...process.env,
+    HOME: homeDir,
+    USERPROFILE: homeDir,
+  };
+  for (const key of [
+    'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY',
+    'http_proxy', 'https_proxy', 'no_proxy',
+    'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN',
+    'ANTHROPIC_BASE_URL', 'ANTHROPIC_API_URL',
+  ]) {
+    delete env[key];
+  }
+  return env;
+}
 
 function runSetupApiKey(homeDir) {
   const script = `
@@ -23,10 +40,7 @@ function runSetupApiKey(homeDir) {
     ['--input-type=module', '--eval', script],
     {
       cwd: path.resolve('.'),
-      env: {
-        ...process.env,
-        HOME: homeDir,
-      },
+      env: buildChildEnv(homeDir),
       encoding: 'utf8',
     }
   );
@@ -50,10 +64,7 @@ function runInjectNetworkEnv(homeDir) {
     ['--input-type=module', '--eval', script],
     {
       cwd: path.resolve('.'),
-      env: {
-        ...process.env,
-        HOME: homeDir,
-      },
+      env: buildChildEnv(homeDir),
       encoding: 'utf8',
     }
   );
@@ -99,10 +110,7 @@ function runResyncNetworkEnv(homeDir) {
     ['--input-type=module', '--eval', script],
     {
       cwd: path.resolve('.'),
-      env: {
-        ...process.env,
-        HOME: homeDir,
-      },
+      env: buildChildEnv(homeDir),
       encoding: 'utf8',
     }
   );

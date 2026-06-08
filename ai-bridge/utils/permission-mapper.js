@@ -204,6 +204,48 @@ export class CodexPermissionMapper {
 }
 
 /**
+ * Agy Permission Mapping
+ *
+ * The google-antigravity Python SDK receives the UI permission mode and builds
+ * concrete policies in Python. The Node layer only normalizes aliases so Java,
+ * Node, and Python agree on the mode names.
+ */
+export class AgyPermissionMapper {
+  /**
+   * Convert unified permission mode to Agy runner configuration.
+   * @param {string} unifiedMode
+   * @returns {{mode: 'default'|'plan'|'acceptEdits'|'bypassPermissions'}}
+   */
+  static toProvider(unifiedMode) {
+    const { core, alias } = normalizeUnifiedMode(unifiedMode);
+
+    if (core === UnifiedPermissionMode.SANDBOX) {
+      return { mode: 'plan' };
+    }
+
+    if (alias === 'acceptEdits') {
+      return { mode: 'acceptEdits' };
+    }
+
+    if (alias === 'bypassPermissions' || core === UnifiedPermissionMode.YOLO) {
+      return { mode: 'bypassPermissions' };
+    }
+
+    return { mode: 'default' };
+  }
+
+  /**
+   * Convert Agy runner configuration to the UI permission mode.
+   * @param {string|{mode?: string}|undefined|null} agyConfig
+   * @returns {string}
+   */
+  static fromProvider(agyConfig) {
+    const mode = typeof agyConfig === 'string' ? agyConfig : agyConfig?.mode;
+    return this.toProvider(mode).mode;
+  }
+}
+
+/**
  * Permission Mapper Factory
  *
  * Automatically selects the correct mapper based on provider type.
@@ -216,8 +258,8 @@ export class CodexPermissionMapper {
 export class PermissionMapperFactory {
   /**
    * Get permission mapper for a specific provider
-   * @param {'claude'|'codex'|'gemini'} provider
-   * @returns {ClaudePermissionMapper|CodexPermissionMapper}
+   * @param {'claude'|'codex'|'agy'|'gemini'} provider
+   * @returns {ClaudePermissionMapper|CodexPermissionMapper|AgyPermissionMapper}
    */
   static getMapper(provider) {
     switch (provider) {
@@ -225,6 +267,8 @@ export class PermissionMapperFactory {
         return ClaudePermissionMapper;
       case 'codex':
         return CodexPermissionMapper;
+      case 'agy':
+        return AgyPermissionMapper;
       case 'gemini':
         // TODO: Implement GeminiPermissionMapper when adding Gemini support
         throw new Error('Gemini permission mapping not yet implemented');
@@ -235,7 +279,7 @@ export class PermissionMapperFactory {
 
   /**
    * Quick conversion: unified → provider-specific
-   * @param {'claude'|'codex'|'gemini'} provider
+   * @param {'claude'|'codex'|'agy'|'gemini'} provider
    * @param {string} unifiedMode
    * @returns {string|object} Provider-specific permission config
    */
@@ -246,7 +290,7 @@ export class PermissionMapperFactory {
 
   /**
    * Quick conversion: provider-specific → unified
-   * @param {'claude'|'codex'|'gemini'} provider
+   * @param {'claude'|'codex'|'agy'|'gemini'} provider
    * @param {string|object} providerConfig
    * @returns {string} Unified permission mode
    */

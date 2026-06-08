@@ -170,6 +170,7 @@ const DependencySection = ({ addToast, isActive }: DependencySectionProps) => {
   const [loadingVersions, setLoadingVersions] = useState<Record<SdkId, boolean>>({
     'claude-sdk': false,
     'codex-sdk': false,
+    'agy-sdk': false,
   });
   const logContainerRef = useRef<HTMLDivElement>(null);
   const isNodePathReadyRef = useRef(false);
@@ -435,6 +436,7 @@ const DependencySection = ({ addToast, isActive }: DependencySectionProps) => {
     setLoadingVersions({
       'claude-sdk': true,
       'codex-sdk': true,
+      'agy-sdk': true,
     });
     sendToJava('get_dependency_status:');
     sendToJava('check_dependency_updates:');

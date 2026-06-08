@@ -15,6 +15,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -76,6 +78,31 @@ public class AgySDKBridgeTest {
         assertFalse(env.get("CLAUDE_PERMISSION_DIR").isBlank());
     }
 
+    @Test
+    public void shouldParseFakeRunnerLineProtocol() throws Exception {
+        CapturingAgySDKBridge bridge = new CapturingAgySDKBridge(pythonManager());
+        RecordingCallback callback = new RecordingCallback();
+
+        SDKResult result = bridge.replayOutputLinesForTest(List.of(
+                "[MESSAGE_START]",
+                "[STREAM_START]",
+                "[THREAD_ID] fake-conversation",
+                "[CONTENT_DELTA] \"hello\"",
+                "[STREAM_END]",
+                "[MESSAGE_END]"
+        ), callback);
+
+        assertEquals("hello", result.finalResult);
+        assertEquals(List.of(
+                "message_start:",
+                "stream_start:",
+                "session_id:fake-conversation",
+                "content_delta:hello",
+                "stream_end:",
+                "message_end:"
+        ), callback.events);
+    }
+
     private PythonDependencyManager pythonManager() throws Exception {
         Path dependenciesDir = temporaryFolder.newFolder("dependencies").toPath();
         return new PythonDependencyManager(dependenciesDir);
@@ -98,6 +125,22 @@ public class AgySDKBridgeTest {
             configureProviderEnv(env, stdinJson);
             envConfigurator.configurePermissionEnv(env);
             return env;
+        }
+
+        private SDKResult replayOutputLinesForTest(List<String> lines, MessageCallback callback) {
+            SDKResult result = new SDKResult();
+            StringBuilder assistantContent = new StringBuilder();
+            AtomicBoolean hadSendError = new AtomicBoolean(false);
+            AtomicReference<String> lastNodeError = new AtomicReference<>(null);
+
+            for (String line : lines) {
+                processOutputLine(line, callback, result, assistantContent, hadSendError, lastNodeError);
+            }
+
+            result.finalResult = assistantContent.toString();
+            result.messageCount = result.messages.size();
+            result.success = !hadSendError.get();
+            return result;
         }
 
         @Override
@@ -130,6 +173,25 @@ public class AgySDKBridgeTest {
 
         @Override
         public void onComplete(SDKResult result) {
+        }
+    }
+
+    private static class RecordingCallback implements MessageCallback {
+        private final List<String> events = new java.util.ArrayList<>();
+
+        @Override
+        public void onMessage(String type, String content) {
+            events.add(type + ":" + content);
+        }
+
+        @Override
+        public void onError(String error) {
+            events.add("error:" + error);
+        }
+
+        @Override
+        public void onComplete(SDKResult result) {
+            events.add("complete:" + result.finalResult);
         }
     }
 }

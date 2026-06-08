@@ -73,3 +73,41 @@ test('sendMessage writes stdin JSON and forwards stdout', async () => {
   assert.equal(JSON.parse(stdin).conversationId, 'thread-1');
   assert.deepEqual(output, ['[MESSAGE_START]\n']);
 });
+
+test('sendMessage forwards fake runner line protocol unchanged', async () => {
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.stdin = {
+    write() {},
+    end() {}
+  };
+
+  const fakeOutput = [
+    '[MESSAGE_START]\n',
+    '[STREAM_START]\n',
+    '[THREAD_ID] fake-conversation\n',
+    '[CONTENT_DELTA] "hello"\n',
+    '[STREAM_END]\n',
+    '[MESSAGE_END]\n',
+    '{"success":true,"threadId":"fake-conversation","result":"hello"}\n'
+  ];
+  const output = [];
+  const spawnImpl = () => {
+    setImmediate(() => {
+      for (const line of fakeOutput) {
+        child.stdout.emit('data', Buffer.from(line));
+      }
+      child.emit('close', 0);
+    });
+    return child;
+  };
+
+  await sendMessage('hello', 'fake-conversation', 'C:/work', 'default', 'gemini-3-pro', '', [], {
+    pythonPath: 'python',
+    spawnImpl,
+    stdoutWrite: (chunk) => output.push(chunk)
+  });
+
+  assert.deepEqual(output, fakeOutput);
+});

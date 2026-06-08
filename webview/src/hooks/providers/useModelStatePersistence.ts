@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { sendBridgeEvent } from '../../utils/bridge';
 import {
   CLAUDE_MODELS,
+  AGY_MODELS,
   CODEX_MODELS,
   isValidPermissionMode,
   normalizeClaudeModelId,
@@ -30,8 +31,10 @@ export interface UseModelStatePersistenceOptions {
   setCurrentProvider: (value: string) => void;
   setSelectedClaudeModel: (value: string) => void;
   setSelectedCodexModel: (value: string) => void;
+  setSelectedAgyModel: (value: string) => void;
   setClaudePermissionMode: (value: PermissionMode) => void;
   setCodexPermissionMode: (value: PermissionMode) => void;
+  setAgyPermissionMode: (value: PermissionMode) => void;
   setPermissionMode: (value: PermissionMode) => void;
   setLongContextEnabled: (value: boolean) => void;
   setReasoningEffort: (value: ReasoningEffort) => void;
@@ -39,8 +42,10 @@ export interface UseModelStatePersistenceOptions {
   currentProvider: string;
   selectedClaudeModel: string;
   selectedCodexModel: string;
+  selectedAgyModel: string;
   claudePermissionMode: PermissionMode;
   codexPermissionMode: PermissionMode;
+  agyPermissionMode: PermissionMode;
   longContextEnabled: boolean;
   reasoningEffort: ReasoningEffort;
 }
@@ -60,16 +65,20 @@ export function useModelStatePersistence(options: UseModelStatePersistenceOption
     setCurrentProvider,
     setSelectedClaudeModel,
     setSelectedCodexModel,
+    setSelectedAgyModel,
     setClaudePermissionMode,
     setCodexPermissionMode,
+    setAgyPermissionMode,
     setPermissionMode,
     setLongContextEnabled,
     setReasoningEffort,
     currentProvider,
     selectedClaudeModel,
     selectedCodexModel,
+    selectedAgyModel,
     claudePermissionMode,
     codexPermissionMode,
+    agyPermissionMode,
     longContextEnabled,
     reasoningEffort,
   } = options;
@@ -83,14 +92,16 @@ export function useModelStatePersistence(options: UseModelStatePersistenceOption
       let restoredProvider = 'claude';
       let restoredClaudeModel = CLAUDE_MODELS[0].id;
       let restoredCodexModel = CODEX_MODELS[0].id;
+      let restoredAgyModel = AGY_MODELS[0].id;
       let restoredClaudePermissionMode: PermissionMode = 'bypassPermissions';
       let restoredCodexPermissionMode: PermissionMode = 'default';
+      let restoredAgyPermissionMode: PermissionMode = 'default';
       let restoredLongContextEnabled = true;
 
       if (saved) {
         const state = JSON.parse(saved);
 
-        if (['claude', 'codex'].includes(state.provider)) {
+        if (['claude', 'codex', 'agy'].includes(state.provider)) {
           restoredProvider = state.provider;
           setCurrentProvider(state.provider);
         }
@@ -102,6 +113,9 @@ export function useModelStatePersistence(options: UseModelStatePersistenceOption
           restoredCodexPermissionMode = state.codexPermissionMode === 'plan'
             ? 'default'
             : state.codexPermissionMode;
+        }
+        if (isValidPermissionMode(state.agyPermissionMode)) {
+          restoredAgyPermissionMode = state.agyPermissionMode;
         }
 
         if (typeof state.longContextEnabled === 'boolean') {
@@ -132,13 +146,25 @@ export function useModelStatePersistence(options: UseModelStatePersistenceOption
           restoredCodexModel = state.codexModel;
           setSelectedCodexModel(state.codexModel);
         }
+
+        const savedAgyCustomModels = getCustomModels('agy-custom-models');
+        if (
+          AGY_MODELS.find(m => m.id === state.agyModel) ||
+          savedAgyCustomModels.find(m => m.id === state.agyModel)
+        ) {
+          restoredAgyModel = state.agyModel;
+          setSelectedAgyModel(state.agyModel);
+        }
       }
 
       const initialPermissionMode: PermissionMode = restoredProvider === 'codex'
         ? restoredCodexPermissionMode
-        : restoredClaudePermissionMode;
+        : restoredProvider === 'agy'
+          ? restoredAgyPermissionMode
+          : restoredClaudePermissionMode;
       setClaudePermissionMode(restoredClaudePermissionMode);
       setCodexPermissionMode(restoredCodexPermissionMode);
+      setAgyPermissionMode(restoredAgyPermissionMode);
       setPermissionMode(initialPermissionMode);
 
       let syncRetryCount = 0;
@@ -149,7 +175,9 @@ export function useModelStatePersistence(options: UseModelStatePersistenceOption
           sendBridgeEvent('set_provider', restoredProvider);
           const modelToSync = restoredProvider === 'codex'
             ? restoredCodexModel
-            : apply1MContextSuffix(restoredClaudeModel, restoredLongContextEnabled);
+            : restoredProvider === 'agy'
+              ? restoredAgyModel
+              : apply1MContextSuffix(restoredClaudeModel, restoredLongContextEnabled);
           sendBridgeEvent('set_model', modelToSync);
           sendBridgeEvent('set_mode', initialPermissionMode);
         } else {
@@ -173,8 +201,10 @@ export function useModelStatePersistence(options: UseModelStatePersistenceOption
         provider: currentProvider,
         claudeModel: selectedClaudeModel,
         codexModel: selectedCodexModel,
+        agyModel: selectedAgyModel,
         claudePermissionMode,
         codexPermissionMode,
+        agyPermissionMode,
         longContextEnabled,
         reasoningEffort,
       }));
@@ -185,8 +215,10 @@ export function useModelStatePersistence(options: UseModelStatePersistenceOption
     currentProvider,
     selectedClaudeModel,
     selectedCodexModel,
+    selectedAgyModel,
     claudePermissionMode,
     codexPermissionMode,
+    agyPermissionMode,
     longContextEnabled,
     reasoningEffort,
   ]);

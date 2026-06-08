@@ -10,6 +10,7 @@ import type { PermissionMode } from '../components/ChatInputBox/types';
 import { isSpecialProviderId } from '../types/provider';
 import { useClaudeProvider } from './providers/useClaudeProvider';
 import { useCodexProvider } from './providers/useCodexProvider';
+import { useAgyProvider } from './providers/useAgyProvider';
 import { useUsageTracking } from './providers/useUsageTracking';
 import { useProviderSettings } from './providers/useProviderSettings';
 import { useModelStatePersistence } from './providers/useModelStatePersistence';
@@ -49,6 +50,7 @@ export function useModelProviderState({ addToast, t }: UseModelProviderStateOpti
   // ── Provider-specific sub-hooks ──
   const claude = useClaudeProvider();
   const codex = useCodexProvider();
+  const agy = useAgyProvider();
   const { isSdkInstalled, ...usage } = useUsageTracking();
   const settings = useProviderSettings({ addToast, t });
 
@@ -63,28 +65,40 @@ export function useModelProviderState({ addToast, t }: UseModelProviderStateOpti
     codexPermissionMode, setCodexPermissionMode,
     reasoningEffort, setReasoningEffort,
   } = codex;
+  const {
+    selectedAgyModel, setSelectedAgyModel,
+    agyPermissionMode, setAgyPermissionMode,
+  } = agy;
 
   // ── Persistence: load on mount + save on change ──
   useModelStatePersistence({
     setCurrentProvider,
     setSelectedClaudeModel,
     setSelectedCodexModel,
+    setSelectedAgyModel,
     setClaudePermissionMode,
     setCodexPermissionMode,
+    setAgyPermissionMode,
     setPermissionMode,
     setLongContextEnabled,
     setReasoningEffort,
     currentProvider,
     selectedClaudeModel,
     selectedCodexModel,
+    selectedAgyModel,
     claudePermissionMode,
     codexPermissionMode,
+    agyPermissionMode,
     longContextEnabled,
     reasoningEffort,
   });
 
   // ── Computed values ──
-  const selectedModel = currentProvider === 'codex' ? selectedCodexModel : selectedClaudeModel;
+  const selectedModel = currentProvider === 'codex'
+    ? selectedCodexModel
+    : currentProvider === 'agy'
+      ? selectedAgyModel
+      : selectedClaudeModel;
   const currentSdkInstalled = useMemo(
     () => isSdkInstalled(currentProvider),
     [isSdkInstalled, currentProvider],
@@ -99,10 +113,16 @@ export function useModelProviderState({ addToast, t }: UseModelProviderStateOpti
       sendBridgeEvent('set_mode', codexMode);
       return;
     }
+    if (currentProvider === 'agy') {
+      setPermissionMode(mode);
+      setAgyPermissionMode(mode);
+      sendBridgeEvent('set_mode', mode);
+      return;
+    }
     setPermissionMode(mode);
     setClaudePermissionMode(mode);
     sendBridgeEvent('set_mode', mode);
-  }, [currentProvider, setCodexPermissionMode, setClaudePermissionMode]);
+  }, [currentProvider, setAgyPermissionMode, setCodexPermissionMode, setClaudePermissionMode]);
 
   const handleModelSelect = useCallback((modelId: string) => {
     if (currentProvider === 'claude') {
@@ -113,8 +133,11 @@ export function useModelProviderState({ addToast, t }: UseModelProviderStateOpti
     } else if (currentProvider === 'codex') {
       setSelectedCodexModel(modelId);
       sendBridgeEvent('set_model', modelId);
+    } else if (currentProvider === 'agy') {
+      setSelectedAgyModel(modelId);
+      sendBridgeEvent('set_model', modelId);
     }
-  }, [currentProvider, longContextEnabled, setSelectedClaudeModel, setSelectedCodexModel]);
+  }, [currentProvider, longContextEnabled, setSelectedAgyModel, setSelectedClaudeModel, setSelectedCodexModel]);
 
   const handleProviderSelect = useCallback((providerId: string) => {
     setCurrentProvider(providerId);
@@ -122,17 +145,23 @@ export function useModelProviderState({ addToast, t }: UseModelProviderStateOpti
 
     const modeToSet: PermissionMode = providerId === 'codex'
       ? (codexPermissionMode === 'plan' ? 'default' : codexPermissionMode)
-      : claudePermissionMode;
+      : providerId === 'agy'
+        ? agyPermissionMode
+        : claudePermissionMode;
     setPermissionMode(modeToSet);
     sendBridgeEvent('set_mode', modeToSet);
 
     const newModel = providerId === 'codex'
       ? selectedCodexModel
-      : apply1MContextSuffix(selectedClaudeModel, longContextEnabled);
+      : providerId === 'agy'
+        ? selectedAgyModel
+        : apply1MContextSuffix(selectedClaudeModel, longContextEnabled);
     sendBridgeEvent('set_model', newModel);
   }, [
+    agyPermissionMode,
     claudePermissionMode,
     codexPermissionMode,
+    selectedAgyModel,
     selectedCodexModel,
     selectedClaudeModel,
     longContextEnabled,
@@ -187,6 +216,7 @@ export function useModelProviderState({ addToast, t }: UseModelProviderStateOpti
   return {
     ...claude,
     ...codex,
+    ...agy,
     ...usage,
     ...settings,
     currentProvider, setCurrentProvider,

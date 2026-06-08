@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from importlib import metadata
 import json
 import os
 import sys
@@ -22,6 +23,19 @@ def emit_json_marker(marker: str, payload: Any, emit: Emit) -> None:
 
 def _default_emit(line: str) -> None:
     print(line, flush=True)
+
+
+def build_version_info() -> dict[str, str]:
+    try:
+        version = metadata.version("google-antigravity")
+    except metadata.PackageNotFoundError:
+        version = "unknown"
+    return {
+        "package": "google-antigravity",
+        "version": version,
+        "python": sys.version.split()[0],
+        "executable": sys.executable,
+    }
 
 
 def _chunk_is(chunk: Any, sdk_type: type, type_name: str) -> bool:
@@ -215,6 +229,9 @@ async def _main_async() -> int:
 
 
 def main() -> int:
+    if "--version" in sys.argv[1:]:
+        print(json.dumps(build_version_info(), ensure_ascii=False), flush=True)
+        return 0
     return asyncio.run(_main_async())
 
 

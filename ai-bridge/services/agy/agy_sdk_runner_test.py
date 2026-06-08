@@ -12,7 +12,7 @@ except ImportError:  # pragma: no cover - depends on local SDK availability
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from agy_sdk_runner import build_content, emit_chunk, emit_error, emit_usage  # noqa: E402
+from agy_sdk_runner import build_content, build_version_info, emit_chunk, emit_error, emit_usage  # noqa: E402
 
 
 class FakeText:
@@ -111,6 +111,13 @@ class AgySdkRunnerTest(unittest.TestCase):
 
         self.assertIn("hello", content)
         self.assertIn("a.txt", content)
+
+    def test_build_version_info_uses_installed_sdk_metadata(self):
+        info = build_version_info()
+
+        self.assertEqual(info["package"], "google-antigravity")
+        self.assertRegex(info["version"], r"\d+\.\d+")
+        self.assertIn("python", info)
 
 
 if __name__ == "__main__":

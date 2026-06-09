@@ -7,6 +7,8 @@ import initSqlJs from 'sql.js';
 
 const serviceDir = dirname(fileURLToPath(import.meta.url));
 const VALID_AUTH_MODES = new Set(['auto', 'localCli', 'apiKey']);
+const AGY_BOT_BOUNDARY_PATTERN = /2\(bot-[0-9a-f-]+/i;
+const AGY_BOT_BOUNDARY_SUFFIX_PATTERN = /2\(bot-[0-9a-f-]+.*$/i;
 
 export function getAgyRunnerPath() {
   return join(serviceDir, 'agy_sdk_runner.py');
@@ -201,7 +203,23 @@ function isLikelyAssistantText(text) {
   if (!value) {
     return false;
   }
+  if (/^```/.test(value)) {
+    return true;
+  }
+  const replacementCount = (value.match(/\uFFFD/g) || []).length;
+  if (replacementCount > 0) {
+    return false;
+  }
   if (value === 'sessionID' || value === 'view_file' || value === 'run_command' || value === 'call_mcp_tool') {
+    return false;
+  }
+  if (AGY_BOT_BOUNDARY_PATTERN.test(value)) {
+    return false;
+  }
+  if (value.length <= 4
+    && !isShortTokenAnswer(value)
+    && !/[\u4e00-\u9fff]/.test(value)
+    && !/^[-*]\s+/.test(value)) {
     return false;
   }
   if (!/[\p{L}\p{N}]/u.test(value)) {
@@ -219,16 +237,15 @@ function isLikelyAssistantText(text) {
   if (/^[A-Za-z0-9_./+=:-]{8,}$/.test(value) && !/\s/.test(value) && !/[#*`.,!?，。！？]/.test(value)) {
     return false;
   }
-  const replacementCount = (value.match(/\uFFFD/g) || []).length;
-  if (replacementCount > 0) {
-    return false;
-  }
   const usefulChars = Array.from(value).filter((ch) => /[\p{L}\p{N}\p{P}\p{S}\p{Zs}\n\t]/u.test(ch)).length;
   return usefulChars / Array.from(value).length > 0.72;
 }
 
 function isLikelyAssistantStart(text) {
   const value = (text || '').trim();
+  if (/^```/.test(value)) {
+    return true;
+  }
   if (isShortTokenAnswer(value)) {
     return true;
   }
@@ -249,31 +266,114 @@ function isShortTokenAnswer(text) {
 
 function normalizeExtractedString(item) {
   return item
-    .replace(/2\(bot-[0-9a-f-]+.*$/i, '')
-    .replace(/[`]+$/g, '')
-    .replace(/[ \t]+/g, ' ')
+    .replace(AGY_BOT_BOUNDARY_SUFFIX_PATTERN, '')
     .trim();
 }
 
+function isLikelyBinaryTailLine(line) {
+  const value = (line || '').trim();
+  if (!value) {
+    return true;
+  }
+  if (/^```/.test(value) || isShortTokenAnswer(value)) {
+    return false;
+  }
+  if ((value.match(/\uFFFD/g) || []).length > 0) {
+    return true;
+  }
+  if (value.length <= 6 && /[^\x00-\x7F\u4e00-\u9fff]/.test(value)) {
+    return true;
+  }
+  if (value.length <= 6 && /[\u4e00-\u9fff]/.test(value) && /[=<>_`~]/.test(value)) {
+    return true;
+  }
+  return value.length <= 4
+    && !/[\u4e00-\u9fff]/.test(value)
+    && !/^[-*]\s+/.test(value)
+    && !/^\d+\.\s+/.test(value);
+}
+
+function trimTrailingBinaryFragments(text) {
+  const lines = text.split('\n');
+  while (lines.length > 0 && isLikelyBinaryTailLine(lines[lines.length - 1])) {
+    lines.pop();
+  }
+  if (lines.length === 0) {
+    return '';
+  }
+  const lastIndex = lines.length - 1;
+  lines[lastIndex] = lines[lastIndex]
+    .replace(/([\u4e00-\u9fff，。！？、；：）】》」』])(?:[`A-Z])$/, '$1')
+    .replace(/([^`])`$/, '$1');
+  return lines.join('\n').trim();
+}
+
+function collapseRepeatedBlocks(text) {
+  const lines = text.split('\n');
+  if (lines.length < 2 || lines.length % 2 !== 0) {
+    return text;
+  }
+  const half = lines.length / 2;
+  const first = lines.slice(0, half).join('\n');
+  const second = lines.slice(half).join('\n');
+  return first === second ? first : text;
+}
+
+function cleanCandidateText(text) {
+  return trimTrailingBinaryFragments(collapseRepeatedBlocks(text.trim()));
+}
+
+function appendCandidatePart(currentParts, rawPart) {
+  const item = normalizeExtractedString(rawPart);
+  if (!item || !isLikelyAssistantText(item)) {
+    return currentParts;
+  }
+  if (currentParts.length === 0 && !isLikelyAssistantStart(item)) {
+    return currentParts;
+  }
+  currentParts.push(item);
+  return currentParts;
+}
+
+function flushCandidate(candidates, currentParts) {
+  if (currentParts.length === 0) {
+    return;
+  }
+  const candidate = cleanCandidateText(currentParts.join('\n'));
+  if (candidate) {
+    candidates.push(candidate);
+  }
+}
+
+function selectAgyAssistantCandidate(candidates) {
+  if (candidates.length === 0) {
+    return '';
+  }
+  const userFacing = candidates.filter((candidate) => isLikelyAssistantStart(candidate));
+  const pool = userFacing.length ? userFacing : candidates;
+  if (pool.some(isShortTokenAnswer)) {
+    return pool.find(isShortTokenAnswer);
+  }
+  return pool[pool.length - 1];
+}
+
 export function extractAgyAssistantTextFromPayload(payload) {
-  const strings = extractPrintableStrings(payload)
-    .map(normalizeExtractedString)
-    .filter(Boolean);
-  const filtered = [];
-  for (const item of strings) {
-    if (!isLikelyAssistantText(item)) {
+  const strings = extractPrintableStrings(payload);
+  const candidates = [];
+  let currentParts = [];
+  for (const rawItem of strings) {
+    const boundaryIndex = rawItem.search(AGY_BOT_BOUNDARY_PATTERN);
+    if (boundaryIndex >= 0) {
+      const beforeBoundary = rawItem.slice(0, boundaryIndex);
+      currentParts = appendCandidatePart(currentParts, beforeBoundary);
+      flushCandidate(candidates, currentParts);
+      currentParts = [];
       continue;
     }
-    if (filtered[filtered.length - 1] !== item) {
-      filtered.push(item);
-    }
+    currentParts = appendCandidatePart(currentParts, rawItem);
   }
-  const start = filtered.findIndex(isLikelyAssistantStart);
-  if (start >= 0 && isShortTokenAnswer(filtered[start])) {
-    return filtered[start];
-  }
-  const selected = start >= 0 ? filtered.slice(start) : [];
-  return selected.join('\n').trim();
+  flushCandidate(candidates, currentParts);
+  return selectAgyAssistantCandidate(candidates);
 }
 
 export async function extractAgyAssistantTextFromDb(conversationId, options = {}) {
@@ -310,7 +410,7 @@ export async function extractAgyAssistantTextFromDb(conversationId, options = {}
 }
 
 async function resolveAgyCliResult(payload, stdoutText, options) {
-  const stdoutValue = stdoutText.trim();
+  const stdoutValue = sanitizeAgyCliStdout(stdoutText);
   const fallbackConversationId = payload.conversationId || readAgyLastConversationId(payload.cwd, options);
   if (stdoutValue) {
     return {
@@ -323,6 +423,32 @@ async function resolveAgyCliResult(payload, stdoutText, options) {
     threadId: fallbackConversationId || payload.conversationId || '',
     text: dbText
   };
+}
+
+function shouldSanitizeAgyCliStdout(stdoutText) {
+  const value = stdoutText || '';
+  if (!value.trim()) {
+    return false;
+  }
+  const controlCount = Array.from(value).filter((ch) => {
+    const code = ch.codePointAt(0);
+    return code < 0x20 && ch !== '\n' && ch !== '\r' && ch !== '\t';
+  }).length;
+  return AGY_BOT_BOUNDARY_PATTERN.test(value)
+    || value.includes('\uFFFD')
+    || /^\s*(?:B!\s*)?sessionID\b/m.test(value)
+    || controlCount > 0;
+}
+
+function sanitizeAgyCliStdout(stdoutText) {
+  const value = stdoutText.trim();
+  if (!value) {
+    return '';
+  }
+  if (!shouldSanitizeAgyCliStdout(value)) {
+    return value;
+  }
+  return extractAgyAssistantTextFromPayload(Buffer.from(value)) || value;
 }
 
 function emitAgyResult(text, threadId, stdoutWrite) {

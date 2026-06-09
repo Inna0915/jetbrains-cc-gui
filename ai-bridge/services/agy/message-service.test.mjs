@@ -68,6 +68,54 @@ test('extractAgyAssistantTextFromPayload handles short token answers with protob
   assert.equal(extractAgyAssistantTextFromPayload(payload), 'LOCAL_AUTH_OK');
 });
 
+test('extractAgyAssistantTextFromPayload keeps the final user-facing answer only', () => {
+  const finalAnswer = [
+    '在文件 P266ErpFormTypeConstants.java 的第 22 行，定义了以下常量：',
+    '```java',
+    'public static final String ERP_ASN = "erpAsn";',
+    '```',
+    '### 含义解析',
+    '1. **这是什么**：它是一个表示 ERP 入库单的 WMS 单据类型常量。',
+    '* **出库类（桶物料）**：专门针对库存单位为 `tong`（桶）的物料对应的 3 种出库来源。'
+  ].join('\n');
+  const payload = Buffer.concat([
+    Buffer.from('B!\nsessionID\n'),
+    Buffer.from(`${finalAnswer}\n`),
+    Buffer.from('**Defining ERP ASN Constant**\n'),
+    Buffer.from('I am identifying the Java constant before answering the user.\n'),
+    Buffer.from('2(bot-a343ba70-7bfa-4ab6-94b2-b2f54d635510B\n'),
+    Buffer.from(`${finalAnswer}Z\n`),
+    Buffer.from('ZE\nI_\n<k\nDa\n`C\n۵I蟸=\n')
+  ]);
+
+  assert.equal(extractAgyAssistantTextFromPayload(payload), finalAnswer);
+});
+
+test('extractAgyAssistantTextFromPayload removes duplicated local greeting blocks', () => {
+  const greeting = [
+    '你好！我是 Antigravity，你的 AI 编程助手。',
+    '我看到你的工作区里有一个 WMS（仓库管理系统）项目，包含以下目录：',
+    '- `wms`',
+    '- `wms-front`',
+    '- `wms-p266`',
+    '- `ykeey-wms-standard`',
+    '请问今天有什么我可以帮你的吗？例如：',
+    '- 查找/修改特定功能的代码',
+    '- 调试或解决报错信息',
+    '- 编写新模块或接口',
+    '- 优化前端/后端代码',
+    '你可以随时告诉我你的具体需求！'
+  ].join('\n');
+  const payload = Buffer.concat([
+    Buffer.from('sessionID\n'),
+    Buffer.from(`${greeting}2(bot-fc7b3607-c661-4994-8af2-e428b18a7f54B\n`),
+    Buffer.from(`${greeting}\`\n`),
+    Buffer.from('r\n9\nŊ7\n')
+  ]);
+
+  assert.equal(extractAgyAssistantTextFromPayload(payload), greeting);
+});
+
 test('sendMessage writes stdin JSON and forwards stdout', async () => {
   const child = new EventEmitter();
   child.stdout = new EventEmitter();
@@ -166,6 +214,54 @@ test('sendMessage uses local agy CLI auth without Gemini key when requested', as
     '[MESSAGE_END]\n',
     '{"success":true,"threadId":"thread-1","result":"CLI answer"}\n'
   ]);
+});
+
+test('sendMessage sanitizes protobuf-like local agy CLI stdout before emitting', async () => {
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.stdin = {
+    write() {},
+    end() {}
+  };
+
+  const cleanAnswer = [
+    '在文件 P266ErpFormTypeConstants.java 的第 22 行，定义了以下常量：',
+    '```java',
+    'public static final String ERP_ASN = "erpAsn";',
+    '```',
+    '### 含义解析'
+  ].join('\n');
+  const output = [];
+  const spawnImpl = () => {
+    setImmediate(() => {
+      child.stdout.emit('data', Buffer.concat([
+        Buffer.from('sessionID\n'),
+        Buffer.from(`${cleanAnswer}\n`),
+        Buffer.from('**Defining ERP ASN Constant**\nI am thinking about the constant.\n'),
+        Buffer.from('2(bot-a343ba70-7bfa-4ab6-94b2-b2f54d635510B\n'),
+        Buffer.from(`${cleanAnswer}Z\nZE\nI_\n`)
+      ]));
+      child.emit('close', 0);
+    });
+    return child;
+  };
+
+  const exitCode = await sendMessage('hello', 'thread-1', 'C:/work', 'default', '', '', [], {
+    authMode: 'localCli',
+    cliPath: 'agy',
+    env: {},
+    spawnImpl,
+    stdoutWrite: (chunk) => output.push(chunk)
+  });
+
+  assert.equal(exitCode, 0);
+  assert.equal(output[3], `[CONTENT_DELTA] ${JSON.stringify(cleanAnswer)}\n`);
+  assert.equal(output[6], `${JSON.stringify({
+    success: true,
+    threadId: 'thread-1',
+    result: cleanAnswer
+  })}\n`);
 });
 
 test('sendMessage auto mode prefers local agy CLI auth over SDK credentials', async () => {

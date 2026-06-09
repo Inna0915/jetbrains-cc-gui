@@ -15,6 +15,7 @@ const FLEX_1_STYLE: React.CSSProperties = { flex: 1 };
 const BUTTON_ROW_STYLE: React.CSSProperties = { display: 'flex', gap: 8, alignItems: 'center' };
 
 type ProviderTab = 'claude' | 'codex' | 'agy';
+type AgyAuthMode = 'auto' | 'localCli' | 'apiKey';
 
 interface ProviderTabSectionProps {
   currentProvider: 'claude' | 'codex' | string;
@@ -72,6 +73,7 @@ const ProviderTabSection = ({
   const [dialogTarget, setDialogTarget] = useState<ProviderTab>('claude');
   const [agyApiKeyInput, setAgyApiKeyInput] = useState('');
   const [agyConfig, setAgyConfig] = useState({
+    authMode: 'auto' as AgyAuthMode,
     hasGeminiApiKey: false,
     hasEnvironmentGeminiApiKey: false,
   });
@@ -82,12 +84,13 @@ const ProviderTabSection = ({
       try {
         const parsed = JSON.parse(jsonStr);
         setAgyConfig({
+          authMode: parsed?.authMode === 'localCli' || parsed?.authMode === 'apiKey' ? parsed.authMode : 'auto',
           hasGeminiApiKey: !!parsed?.hasGeminiApiKey,
           hasEnvironmentGeminiApiKey: !!parsed?.hasEnvironmentGeminiApiKey,
         });
         setAgyApiKeyInput('');
       } catch {
-        setAgyConfig({ hasGeminiApiKey: false, hasEnvironmentGeminiApiKey: false });
+        setAgyConfig({ authMode: 'auto', hasGeminiApiKey: false, hasEnvironmentGeminiApiKey: false });
       }
     };
     window.sendToJava?.('get_agy_config:');
@@ -114,6 +117,11 @@ const ProviderTabSection = ({
     }
     window.sendToJava?.(`set_agy_config:${JSON.stringify({ geminiApiKey: normalizedApiKey })}`);
   }, [agyApiKeyInput]);
+
+  const saveAgyAuthMode = useCallback((nextMode: AgyAuthMode) => {
+    setAgyConfig((current) => ({ ...current, authMode: nextMode }));
+    window.sendToJava?.(`set_agy_config:${JSON.stringify({ authMode: nextMode })}`);
+  }, []);
 
   const clearAgyApiKey = useCallback(() => {
     setAgyApiKeyInput('');
@@ -235,6 +243,24 @@ const ProviderTabSection = ({
       </div>
 
       <div id="panel-agy-providers" role="tabpanel" style={activeTab === 'agy' ? BLOCK_STYLE : NONE_STYLE}>
+        <div className={styles.agyCredentialBlock}>
+          <div className={styles.agyCredentialHeader}>
+            <label htmlFor="agy-auth-mode" className={styles.agyCredentialLabel}>
+              {t('settings.agy.authMode', { defaultValue: 'Auth mode' })}
+            </label>
+          </div>
+          <select
+            id="agy-auth-mode"
+            className={styles.agyCredentialInput}
+            value={agyConfig.authMode}
+            onChange={(e) => saveAgyAuthMode(e.target.value as AgyAuthMode)}
+          >
+            <option value="auto">{t('settings.agy.authModeAuto', { defaultValue: 'Auto' })}</option>
+            <option value="localCli">{t('settings.agy.authModeLocalCli', { defaultValue: 'Local agy login' })}</option>
+            <option value="apiKey">{t('settings.agy.authModeApiKey', { defaultValue: 'Gemini API key' })}</option>
+          </select>
+        </div>
+
         <div className={styles.agyCredentialBlock}>
           <div className={styles.agyCredentialHeader}>
             <label htmlFor="agy-gemini-api-key" className={styles.agyCredentialLabel}>

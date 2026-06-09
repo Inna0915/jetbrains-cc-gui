@@ -40,6 +40,33 @@ public class CodemossSettingsServiceAgyConfigTest {
     }
 
     @Test
+    public void defaultsAgyAuthModeToAutoAndPersistsLocalCliMode() throws Exception {
+        Path tempHome = Files.createTempDirectory("agy-auth-mode-home");
+        useTemporaryHomeDirectory(tempHome);
+
+        CodemossSettingsService service = new CodemossSettingsService();
+
+        assertEquals("auto", service.getAgyAuthMode());
+        assertEquals("auto", service.getAgyConfig().get("authMode").getAsString());
+
+        service.setAgyAuthMode(" localCli ");
+
+        assertEquals("localCli", service.getAgyAuthMode());
+        assertEquals("localCli", service.getAgyConfig().get("authMode").getAsString());
+    }
+
+    @Test
+    public void invalidAgyAuthModeFallsBackToAuto() throws Exception {
+        Path tempHome = Files.createTempDirectory("agy-auth-mode-invalid-home");
+        useTemporaryHomeDirectory(tempHome);
+
+        CodemossSettingsService service = new CodemossSettingsService();
+        service.setAgyAuthMode("unexpected");
+
+        assertEquals("auto", service.getAgyAuthMode());
+    }
+
+    @Test
     public void blankAgyGeminiApiKeyClearsPersistedKey() throws Exception {
         Path tempHome = Files.createTempDirectory("agy-config-clear-home");
         useTemporaryHomeDirectory(tempHome);

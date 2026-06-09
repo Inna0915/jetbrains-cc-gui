@@ -401,8 +401,14 @@ public class ProjectConfigHandler {
     public void handleSetAgyConfig(String content) {
         try {
             JsonObject json = gson.fromJson(content, JsonObject.class);
-            String geminiApiKey = readString(json, "geminiApiKey", "");
-            settingsService.setAgyGeminiApiKey(geminiApiKey);
+            if (json != null && json.has("geminiApiKey")) {
+                String geminiApiKey = readString(json, "geminiApiKey", "");
+                settingsService.setAgyGeminiApiKey(geminiApiKey);
+            }
+            if (json != null && json.has("authMode")) {
+                String authMode = readString(json, "authMode", "auto");
+                settingsService.setAgyAuthMode(authMode);
+            }
             pushJson("window.updateAgyConfig", settingsService.getAgyConfig());
             ApplicationManager.getApplication().invokeLater(() ->
                     context.callJavaScript("window.showSuccessI18n", "toast.saveSuccess"));

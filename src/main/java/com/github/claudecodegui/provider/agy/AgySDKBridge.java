@@ -28,22 +28,33 @@ import java.util.function.Supplier;
 public class AgySDKBridge extends BaseSDKBridge {
     private final PythonDependencyManager pythonDependencyManager;
     private final Supplier<String> geminiApiKeySupplier;
+    private final Supplier<String> authModeSupplier;
 
     public AgySDKBridge() {
         this(
                 new PythonDependencyManager(new DependencyManager().getDependenciesDir()),
-                AgySDKBridge::loadConfiguredGeminiApiKey
+                AgySDKBridge::loadConfiguredGeminiApiKey,
+                AgySDKBridge::loadConfiguredAuthMode
         );
     }
 
     AgySDKBridge(PythonDependencyManager pythonDependencyManager) {
-        this(pythonDependencyManager, AgySDKBridge::loadConfiguredGeminiApiKey);
+        this(pythonDependencyManager, AgySDKBridge::loadConfiguredGeminiApiKey, AgySDKBridge::loadConfiguredAuthMode);
     }
 
     AgySDKBridge(PythonDependencyManager pythonDependencyManager, Supplier<String> geminiApiKeySupplier) {
+        this(pythonDependencyManager, geminiApiKeySupplier, AgySDKBridge::loadConfiguredAuthMode);
+    }
+
+    AgySDKBridge(
+            PythonDependencyManager pythonDependencyManager,
+            Supplier<String> geminiApiKeySupplier,
+            Supplier<String> authModeSupplier
+    ) {
         super(AgySDKBridge.class);
         this.pythonDependencyManager = pythonDependencyManager;
         this.geminiApiKeySupplier = geminiApiKeySupplier;
+        this.authModeSupplier = authModeSupplier;
     }
 
     @Override
@@ -56,6 +67,7 @@ public class AgySDKBridge extends BaseSDKBridge {
         env.put("AGY_USE_STDIN", "true");
         Path pythonPath = pythonDependencyManager.getVenvPython(SdkDefinition.AGY_SDK.getId());
         env.put("AGY_PYTHON_PATH", pythonPath.toString());
+        env.put("AGY_AUTH_MODE", resolveAuthMode());
         String apiKey = resolveGeminiApiKey();
         if (!apiKey.isEmpty()) {
             env.put("GEMINI_API_KEY", apiKey);
@@ -128,6 +140,7 @@ public class AgySDKBridge extends BaseSDKBridge {
         if (!apiKey.isEmpty()) {
             stdinInput.addProperty("apiKey", apiKey);
         }
+        stdinInput.addProperty("authMode", resolveAuthMode());
         stdinInput.add("attachments", buildAttachments(attachments));
         if (agentPrompt != null && !agentPrompt.isEmpty()) {
             stdinInput.addProperty("agentPrompt", agentPrompt);
@@ -151,11 +164,38 @@ public class AgySDKBridge extends BaseSDKBridge {
         }
     }
 
+    private String resolveAuthMode() {
+        try {
+            String value = authModeSupplier != null ? authModeSupplier.get() : null;
+            return normalizeAuthMode(value);
+        } catch (Exception e) {
+            LOG.warn("[Agy] Failed to resolve configured auth mode: " + e.getMessage());
+            return CodemossSettingsService.AGY_AUTH_MODE_AUTO;
+        }
+    }
+
+    private String normalizeAuthMode(String value) {
+        String normalized = value == null ? "" : value.trim();
+        if (CodemossSettingsService.AGY_AUTH_MODE_LOCAL_CLI.equals(normalized)
+                || CodemossSettingsService.AGY_AUTH_MODE_API_KEY.equals(normalized)) {
+            return normalized;
+        }
+        return CodemossSettingsService.AGY_AUTH_MODE_AUTO;
+    }
+
     private static String loadConfiguredGeminiApiKey() {
         try {
             return new CodemossSettingsService().getAgyGeminiApiKey();
         } catch (Exception e) {
             return "";
+        }
+    }
+
+    private static String loadConfiguredAuthMode() {
+        try {
+            return new CodemossSettingsService().getAgyAuthMode();
+        } catch (Exception e) {
+            return CodemossSettingsService.AGY_AUTH_MODE_AUTO;
         }
     }
 

@@ -35,7 +35,7 @@ public class AgySDKBridgeTest {
 
     @Test
     public void shouldSendAgyPayloadThroughStdin() throws Exception {
-        CapturingAgySDKBridge bridge = new CapturingAgySDKBridge(pythonManager(), () -> "gemini-test-key");
+        CapturingAgySDKBridge bridge = new CapturingAgySDKBridge(pythonManager(), () -> "gemini-test-key", () -> "apiKey");
 
         bridge.sendMessage(
                 "channel-1",
@@ -59,6 +59,7 @@ public class AgySDKBridgeTest {
         assertEquals("Stay concise", payload.get("agentPrompt").getAsString());
         assertEquals("medium", payload.get("reasoningEffort").getAsString());
         assertEquals("gemini-test-key", payload.get("apiKey").getAsString());
+        assertEquals("apiKey", payload.get("authMode").getAsString());
         assertTrue(bridge.capturedCommand.contains("agy"));
         assertTrue(bridge.capturedCommand.contains("send"));
     }
@@ -72,6 +73,7 @@ public class AgySDKBridgeTest {
         Map<String, String> env = bridge.buildEnvironmentForTest("{}");
 
         assertEquals("true", env.get("AGY_USE_STDIN"));
+        assertEquals("auto", env.get("AGY_AUTH_MODE"));
         assertEquals(
                 pythonManager.getVenvPython(SdkDefinition.AGY_SDK.getId()).toString(),
                 env.get("AGY_PYTHON_PATH")
@@ -121,7 +123,15 @@ public class AgySDKBridgeTest {
         }
 
         private CapturingAgySDKBridge(PythonDependencyManager pythonDependencyManager, java.util.function.Supplier<String> apiKeySupplier) {
-            super(pythonDependencyManager, apiKeySupplier);
+            this(pythonDependencyManager, apiKeySupplier, () -> "auto");
+        }
+
+        private CapturingAgySDKBridge(
+                PythonDependencyManager pythonDependencyManager,
+                java.util.function.Supplier<String> apiKeySupplier,
+                java.util.function.Supplier<String> authModeSupplier
+        ) {
+            super(pythonDependencyManager, apiKeySupplier, authModeSupplier);
         }
 
         private String providerNameForTest() {

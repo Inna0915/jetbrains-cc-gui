@@ -1,9 +1,12 @@
 import { spawn } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import initSqlJs from 'sql.js';
 
 const serviceDir = dirname(fileURLToPath(import.meta.url));
+const VALID_AUTH_MODES = new Set(['auto', 'localCli', 'apiKey']);
 
 export function getAgyRunnerPath() {
   return join(serviceDir, 'agy_sdk_runner.py');
@@ -31,6 +34,52 @@ export function buildAgyRunnerInvocation(options = {}) {
   };
 }
 
+export function normalizeAgyAuthMode(authMode) {
+  const value = typeof authMode === 'string' ? authMode.trim() : '';
+  return VALID_AUTH_MODES.has(value) ? value : 'auto';
+}
+
+export function getDefaultAgyCliPath(platform = process.platform) {
+  if (platform === 'win32') {
+    return join(homedir(), 'AppData', 'Local', 'agy', 'bin', 'agy.exe');
+  }
+  return 'agy';
+}
+
+export function resolveAgyCliPath(options = {}) {
+  if (options.cliPath) {
+    return options.cliPath;
+  }
+  if (process.env.AGY_CLI_PATH) {
+    return process.env.AGY_CLI_PATH;
+  }
+  const defaultPath = getDefaultAgyCliPath();
+  if (defaultPath !== 'agy' && existsSync(defaultPath)) {
+    return defaultPath;
+  }
+  return 'agy';
+}
+
+export function buildAgyCliInvocation(payload = {}, options = {}) {
+  const args = [];
+  const permissionMode = payload.permissionMode || 'default';
+  if (permissionMode === 'bypassPermissions') {
+    args.push('--dangerously-skip-permissions');
+  }
+  if (payload.conversationId) {
+    args.push('--conversation', payload.conversationId);
+  }
+  if (payload.model) {
+    args.push('--model', payload.model);
+  }
+  args.push('--print-timeout', options.printTimeout || payload.printTimeout || '5m');
+  args.push('--print', payload.message || '');
+  return {
+    command: resolveAgyCliPath(options),
+    args
+  };
+}
+
 export function buildAgyStdinPayload({
   message,
   conversationId,
@@ -43,7 +92,8 @@ export function buildAgyStdinPayload({
   attachments,
   saveDir,
   agentPrompt,
-  reasoningEffort
+  reasoningEffort,
+  authMode
 }) {
   return {
     message: message || '',
@@ -55,7 +105,8 @@ export function buildAgyStdinPayload({
     attachments: Array.isArray(attachments) ? attachments : [],
     saveDir: saveDir || null,
     agentPrompt: agentPrompt || null,
-    reasoningEffort: reasoningEffort || null
+    reasoningEffort: reasoningEffort || null,
+    authMode: normalizeAgyAuthMode(authMode)
   };
 }
 
@@ -71,6 +122,286 @@ function forwardStderrChunk(chunk, stdoutWrite) {
       stdoutWrite(`[DEBUG] ${line}\n`);
     }
   }
+}
+
+function shouldUseLocalCli(payload = {}, options = {}) {
+  const authMode = normalizeAgyAuthMode(options.authMode || payload.authMode);
+  return authMode === 'localCli' || authMode === 'auto';
+}
+
+function getLastConversationsPath(options = {}) {
+  return options.lastConversationsPath
+    || join(homedir(), '.gemini', 'antigravity-cli', 'cache', 'last_conversations.json');
+}
+
+function getConversationDbPath(conversationId, options = {}) {
+  const conversationsDir = options.conversationsDir
+    || join(homedir(), '.gemini', 'antigravity-cli', 'conversations');
+  return join(conversationsDir, `${conversationId}.db`);
+}
+
+export function readAgyLastConversationId(cwd, options = {}) {
+  const filePath = getLastConversationsPath(options);
+  if (!cwd || !existsSync(filePath)) {
+    return '';
+  }
+  try {
+    const data = JSON.parse(readFileSync(filePath, 'utf8'));
+    const candidates = [cwd, normalize(cwd)];
+    for (const candidate of candidates) {
+      if (data[candidate]) {
+        return String(data[candidate]);
+      }
+    }
+    const normalizedCwd = normalize(cwd).toLowerCase();
+    const foundKey = Object.keys(data).find((key) => normalize(key).toLowerCase() === normalizedCwd);
+    return foundKey ? String(data[foundKey]) : '';
+  } catch {
+    return '';
+  }
+}
+
+function extractPrintableStrings(value) {
+  if (!value) {
+    return [];
+  }
+  const buffer = Buffer.from(value);
+  const parts = [];
+  let start = -1;
+  const flush = (end) => {
+    if (start >= 0 && end - start >= 2) {
+      const text = buffer.subarray(start, end).toString('utf8')
+        .replace(/\u0000/g, '')
+        .replace(/\r\n/g, '\n')
+        .trim();
+      if (text) {
+        parts.push(text);
+      }
+    }
+    start = -1;
+  };
+
+  for (let i = 0; i < buffer.length; i += 1) {
+    const byte = buffer[i];
+    const printable = byte >= 0x20 && byte !== 0x7f;
+    if (printable) {
+      if (start < 0) {
+        start = i;
+      }
+    } else {
+      flush(i);
+    }
+  }
+  flush(buffer.length);
+  return parts.map((part) => part.replace(/[ \t]+\n/g, '\n').trim()).filter(Boolean);
+}
+
+function isLikelyAssistantText(text) {
+  const value = (text || '').trim();
+  if (!value) {
+    return false;
+  }
+  if (value === 'sessionID' || value === 'view_file' || value === 'run_command' || value === 'call_mcp_tool') {
+    return false;
+  }
+  if (!/[\p{L}\p{N}]/u.test(value)) {
+    return false;
+  }
+  if (/^\{.*"tool(Action|Summary|Name)"/.test(value)) {
+    return false;
+  }
+  if (/^"?\$?[0-9a-f]{8,}-[0-9a-f-]{20,}$/i.test(value)) {
+    return false;
+  }
+  if (/^[A-Z][A-Z0-9_ -]{2,80}[.!?]?$/.test(value)) {
+    return true;
+  }
+  if (/^[A-Za-z0-9_./+=:-]{8,}$/.test(value) && !/\s/.test(value) && !/[#*`.,!?，。！？]/.test(value)) {
+    return false;
+  }
+  const replacementCount = (value.match(/\uFFFD/g) || []).length;
+  if (replacementCount > 0) {
+    return false;
+  }
+  const usefulChars = Array.from(value).filter((ch) => /[\p{L}\p{N}\p{P}\p{S}\p{Zs}\n\t]/u.test(ch)).length;
+  return usefulChars / Array.from(value).length > 0.72;
+}
+
+function isLikelyAssistantStart(text) {
+  const value = (text || '').trim();
+  if (isShortTokenAnswer(value)) {
+    return true;
+  }
+  if (/^[#*>-]\s/.test(value)) {
+    return true;
+  }
+  if (/[\u4e00-\u9fff]/.test(value) && /[\s，。！？、；：]/.test(value)) {
+    return true;
+  }
+  const wordCount = (value.match(/[A-Za-z]{2,}/g) || []).length;
+  return /\s/.test(value) && (wordCount >= 3 || /[.!?:;]/.test(value));
+}
+
+function isShortTokenAnswer(text) {
+  const value = (text || '').trim();
+  return /^(OK|Yes|No)$/i.test(value) || /^[A-Z][A-Z0-9_ -]{2,80}[.!?]?$/.test(value);
+}
+
+function normalizeExtractedString(item) {
+  return item
+    .replace(/2\(bot-[0-9a-f-]+.*$/i, '')
+    .replace(/[`]+$/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+}
+
+export function extractAgyAssistantTextFromPayload(payload) {
+  const strings = extractPrintableStrings(payload)
+    .map(normalizeExtractedString)
+    .filter(Boolean);
+  const filtered = [];
+  for (const item of strings) {
+    if (!isLikelyAssistantText(item)) {
+      continue;
+    }
+    if (filtered[filtered.length - 1] !== item) {
+      filtered.push(item);
+    }
+  }
+  const start = filtered.findIndex(isLikelyAssistantStart);
+  if (start >= 0 && isShortTokenAnswer(filtered[start])) {
+    return filtered[start];
+  }
+  const selected = start >= 0 ? filtered.slice(start) : [];
+  return selected.join('\n').trim();
+}
+
+export async function extractAgyAssistantTextFromDb(conversationId, options = {}) {
+  if (!conversationId) {
+    return '';
+  }
+  const dbPath = getConversationDbPath(conversationId, options);
+  if (!existsSync(dbPath)) {
+    return '';
+  }
+  const SQL = await initSqlJs();
+  const db = new SQL.Database(readFileSync(dbPath));
+  try {
+    const result = db.exec(`
+      SELECT step_payload
+      FROM steps
+      WHERE step_type = 15 AND status = 3
+      ORDER BY idx DESC
+      LIMIT 8
+    `);
+    if (!result.length || !result[0].values.length) {
+      return '';
+    }
+    for (const row of result[0].values) {
+      const text = extractAgyAssistantTextFromPayload(row[0]);
+      if (text) {
+        return text;
+      }
+    }
+    return '';
+  } finally {
+    db.close();
+  }
+}
+
+async function resolveAgyCliResult(payload, stdoutText, options) {
+  const stdoutValue = stdoutText.trim();
+  const fallbackConversationId = payload.conversationId || readAgyLastConversationId(payload.cwd, options);
+  if (stdoutValue) {
+    return {
+      threadId: fallbackConversationId || payload.conversationId || '',
+      text: stdoutValue
+    };
+  }
+  const dbText = await extractAgyAssistantTextFromDb(fallbackConversationId, options);
+  return {
+    threadId: fallbackConversationId || payload.conversationId || '',
+    text: dbText
+  };
+}
+
+function emitAgyResult(text, threadId, stdoutWrite) {
+  stdoutWrite('[MESSAGE_START]\n');
+  stdoutWrite('[STREAM_START]\n');
+  if (threadId) {
+    stdoutWrite(`[THREAD_ID] ${threadId}\n`);
+  }
+  stdoutWrite(`[CONTENT_DELTA] ${JSON.stringify(text)}\n`);
+  stdoutWrite('[STREAM_END]\n');
+  stdoutWrite('[MESSAGE_END]\n');
+  stdoutWrite(`${JSON.stringify({
+    success: true,
+    threadId: threadId || null,
+    result: text
+  })}\n`);
+}
+
+export async function runAgyCliPrint(payload, options = {}) {
+  const { command, args } = buildAgyCliInvocation(payload, options);
+  const spawnImpl = options.spawnImpl || spawn;
+  const stdoutWrite = options.stdoutWrite || ((chunk) => process.stdout.write(chunk));
+  const runtimeEnv = options.env || process.env;
+  let child;
+  try {
+    child = spawnImpl(command, args, {
+      cwd: payload.cwd || process.cwd(),
+      env: runtimeEnv,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+  } catch (error) {
+    stdoutWrite(`[SEND_ERROR] ${JSON.stringify({
+      success: false,
+      error: `Failed to start local agy CLI: ${error.message}`
+    })}\n`);
+    return 1;
+  }
+
+  let stdoutText = '';
+  const stderrLines = [];
+  child.stdout.on('data', (chunk) => {
+    stdoutText += chunk.toString();
+  });
+  child.stderr.on('data', (chunk) => {
+    const text = chunk.toString();
+    stderrLines.push(text);
+    forwardStderrChunk(chunk, stdoutWrite);
+  });
+
+  return new Promise((resolve) => {
+    child.on('error', (error) => {
+      stdoutWrite(`[SEND_ERROR] ${JSON.stringify({
+        success: false,
+        error: `Failed to start local agy CLI: ${error.message}`
+      })}\n`);
+      resolve(1);
+    });
+    child.on('close', async (code) => {
+      if (code !== 0) {
+        stdoutWrite(`[SEND_ERROR] ${JSON.stringify({
+          success: false,
+          error: stderrLines.join('').trim() || `Agy CLI exited with code ${code}`
+        })}\n`);
+        resolve(code);
+        return;
+      }
+      const result = await resolveAgyCliResult(payload, stdoutText, options);
+      if (!result.text) {
+        stdoutWrite(`[SEND_ERROR] ${JSON.stringify({
+          success: false,
+          error: 'Agy CLI completed but no response was captured from stdout or the local conversation store.'
+        })}\n`);
+        resolve(1);
+        return;
+      }
+      emitAgyResult(result.text, result.threadId, stdoutWrite);
+      resolve(0);
+    });
+  });
 }
 
 export async function runAgyRunner(payload, options = {}) {
@@ -147,7 +478,11 @@ export async function sendMessage(
     attachments,
     saveDir: options.saveDir,
     agentPrompt: options.agentPrompt,
-    reasoningEffort: options.reasoningEffort
+    reasoningEffort: options.reasoningEffort,
+    authMode: options.authMode
   });
+  if (shouldUseLocalCli(payload, options)) {
+    return runAgyCliPrint(payload, options);
+  }
   return runAgyRunner(payload, options);
 }

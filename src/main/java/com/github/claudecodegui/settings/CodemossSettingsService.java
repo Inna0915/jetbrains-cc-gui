@@ -51,6 +51,10 @@ public class CodemossSettingsService {
     private static final String PROMPT_ENHANCER_KEY = "promptEnhancer";
     private static final String AGY_KEY = "agy";
     private static final String AGY_GEMINI_API_KEY = "geminiApiKey";
+    private static final String AGY_AUTH_MODE = "authMode";
+    public static final String AGY_AUTH_MODE_AUTO = "auto";
+    public static final String AGY_AUTH_MODE_LOCAL_CLI = "localCli";
+    public static final String AGY_AUTH_MODE_API_KEY = "apiKey";
     private static final String AI_FEATURE_PROVIDER_KEY = "provider";
     private static final String AI_FEATURE_MODELS_KEY = "models";
     private static final String AI_FEATURE_EFFECTIVE_PROVIDER_KEY = "effectiveProvider";
@@ -822,6 +826,7 @@ public class CodemossSettingsService {
         String configuredApiKey = getAgyGeminiApiKey(config);
 
         JsonObject response = new JsonObject();
+        response.addProperty("authMode", getAgyAuthMode(config));
         response.addProperty("hasGeminiApiKey", !configuredApiKey.isEmpty());
         response.addProperty("hasEnvironmentGeminiApiKey", hasEnvironmentGeminiApiKey());
         return response;
@@ -829,6 +834,19 @@ public class CodemossSettingsService {
 
     public String getAgyGeminiApiKey() throws IOException {
         return getAgyGeminiApiKey(readConfig());
+    }
+
+    public String getAgyAuthMode() throws IOException {
+        return getAgyAuthMode(readConfig());
+    }
+
+    public void setAgyAuthMode(String authMode) throws IOException {
+        JsonObject config = readConfig();
+        JsonObject agy = getOrCreateAgyConfig(config);
+        agy.addProperty(AGY_AUTH_MODE, normalizeAgyAuthMode(authMode));
+        config.add(AGY_KEY, agy);
+        writeConfig(config);
+        LOG.info("[CodemossSettings] Updated Agy auth mode: " + agy.get(AGY_AUTH_MODE).getAsString());
     }
 
     public void setAgyGeminiApiKey(String apiKey) throws IOException {
@@ -864,6 +882,25 @@ public class CodemossSettingsService {
         }
         String value = agy.get(AGY_GEMINI_API_KEY).getAsString();
         return value == null ? "" : value.trim();
+    }
+
+    private String getAgyAuthMode(JsonObject config) {
+        if (config == null || !config.has(AGY_KEY) || !config.get(AGY_KEY).isJsonObject()) {
+            return AGY_AUTH_MODE_AUTO;
+        }
+        JsonObject agy = config.getAsJsonObject(AGY_KEY);
+        if (!agy.has(AGY_AUTH_MODE) || agy.get(AGY_AUTH_MODE).isJsonNull()) {
+            return AGY_AUTH_MODE_AUTO;
+        }
+        return normalizeAgyAuthMode(agy.get(AGY_AUTH_MODE).getAsString());
+    }
+
+    private String normalizeAgyAuthMode(String authMode) {
+        String normalized = authMode == null ? "" : authMode.trim();
+        if (AGY_AUTH_MODE_LOCAL_CLI.equals(normalized) || AGY_AUTH_MODE_API_KEY.equals(normalized)) {
+            return normalized;
+        }
+        return AGY_AUTH_MODE_AUTO;
     }
 
     private boolean hasEnvironmentGeminiApiKey() {

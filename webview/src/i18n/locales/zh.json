@@ -315,6 +315,10 @@
       "agy": "Agy"
     },
     "agy": {
+      "authMode": "认证方式",
+      "authModeAuto": "自动",
+      "authModeLocalCli": "本地 agy 登录",
+      "authModeApiKey": "Gemini API Key",
       "geminiApiKey": "Gemini API Key",
       "configured": "已配置",
       "notConfigured": "未配置",

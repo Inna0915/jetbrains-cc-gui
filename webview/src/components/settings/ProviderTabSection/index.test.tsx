@@ -11,7 +11,11 @@ const translations: Record<string, string> = {
   'settings.providerTab.agy': 'Agy',
   'settings.pluginModels.title': 'Custom Models',
   'settings.pluginModels.manage': 'Manage Models',
-};
+  'settings.agy.authMode': 'Auth mode',
+  'settings.agy.authModeAuto': 'Auto',
+  'settings.agy.authModeLocalCli': 'Local agy login',
+  'settings.agy.authModeApiKey': 'Gemini API key',
+  };
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -114,6 +118,26 @@ describe('ProviderTabSection', () => {
       window.updateAgyConfig?.(JSON.stringify({ hasGeminiApiKey: true, hasEnvironmentGeminiApiKey: false }));
     });
     expect(screen.getByText('Configured')).toBeTruthy();
+  });
+
+  it('saves Agy auth mode through backend config', () => {
+    render(<ProviderTabSection currentProvider="agy" {...defaultProps} />);
+
+    act(() => {
+      window.updateAgyConfig?.(JSON.stringify({
+        authMode: 'auto',
+        hasGeminiApiKey: false,
+        hasEnvironmentGeminiApiKey: false,
+      }));
+    });
+
+    fireEvent.change(screen.getByLabelText('Auth mode'), {
+      target: { value: 'localCli' },
+    });
+
+    expect(window.sendToJava).toHaveBeenCalledWith(
+      'set_agy_config:{"authMode":"localCli"}',
+    );
   });
 
   it('does not clear an existing Agy key when the save input is blank', () => {

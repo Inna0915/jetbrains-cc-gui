@@ -315,6 +315,10 @@
       "agy": "Agy"
     },
     "agy": {
+      "authMode": "Auth mode",
+      "authModeAuto": "Auto",
+      "authModeLocalCli": "Local agy login",
+      "authModeApiKey": "Gemini API key",
       "geminiApiKey": "Gemini API key",
       "configured": "Configured",
       "notConfigured": "Not configured",

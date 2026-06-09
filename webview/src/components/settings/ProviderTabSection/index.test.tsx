@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ProviderTabSection from './index';
 import { STORAGE_KEYS } from '../../../types/provider';
@@ -15,7 +15,7 @@ const translations: Record<string, string> = {
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => translations[key] ?? key,
+    t: (key: string, options?: { defaultValue?: string }) => translations[key] ?? options?.defaultValue ?? key,
   }),
 }));
 
@@ -68,6 +68,8 @@ describe('ProviderTabSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    window.sendToJava = vi.fn();
+    window.updateAgyConfig = undefined;
   });
 
   it('renders an Agy provider tab', () => {
@@ -92,5 +94,40 @@ describe('ProviderTabSection', () => {
 
     expect(screen.getByRole('dialog')).toBeTruthy();
     expect(screen.getByText('gemini-custom')).toBeTruthy();
+  });
+
+  it('saves Agy Gemini API key through backend config', () => {
+    render(<ProviderTabSection currentProvider="agy" {...defaultProps} />);
+
+    expect(window.sendToJava).toHaveBeenCalledWith('get_agy_config:');
+
+    fireEvent.change(screen.getByLabelText('Gemini API key'), {
+      target: { value: 'gemini-test-key' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save API Key' }));
+
+    expect(window.sendToJava).toHaveBeenCalledWith(
+      'set_agy_config:{"geminiApiKey":"gemini-test-key"}',
+    );
+
+    act(() => {
+      window.updateAgyConfig?.(JSON.stringify({ hasGeminiApiKey: true, hasEnvironmentGeminiApiKey: false }));
+    });
+    expect(screen.getByText('Configured')).toBeTruthy();
+  });
+
+  it('does not clear an existing Agy key when the save input is blank', () => {
+    render(<ProviderTabSection currentProvider="agy" {...defaultProps} />);
+
+    act(() => {
+      window.updateAgyConfig?.(JSON.stringify({ hasGeminiApiKey: true, hasEnvironmentGeminiApiKey: false }));
+    });
+
+    const saveButton = screen.getByRole('button', { name: 'Save API Key' });
+    expect((saveButton as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(saveButton);
+
+    expect(window.sendToJava).not.toHaveBeenCalledWith('set_agy_config:{"geminiApiKey":""}');
   });
 });

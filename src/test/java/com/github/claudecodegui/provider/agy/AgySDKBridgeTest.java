@@ -35,7 +35,7 @@ public class AgySDKBridgeTest {
 
     @Test
     public void shouldSendAgyPayloadThroughStdin() throws Exception {
-        CapturingAgySDKBridge bridge = new CapturingAgySDKBridge(pythonManager());
+        CapturingAgySDKBridge bridge = new CapturingAgySDKBridge(pythonManager(), () -> "gemini-test-key");
 
         bridge.sendMessage(
                 "channel-1",
@@ -58,6 +58,7 @@ public class AgySDKBridgeTest {
         assertEquals("gemini-3-pro", payload.get("model").getAsString());
         assertEquals("Stay concise", payload.get("agentPrompt").getAsString());
         assertEquals("medium", payload.get("reasoningEffort").getAsString());
+        assertEquals("gemini-test-key", payload.get("apiKey").getAsString());
         assertTrue(bridge.capturedCommand.contains("agy"));
         assertTrue(bridge.capturedCommand.contains("send"));
     }
@@ -65,7 +66,7 @@ public class AgySDKBridgeTest {
     @Test
     public void shouldConfigureAgyEnvironment() throws Exception {
         PythonDependencyManager pythonManager = pythonManager();
-        CapturingAgySDKBridge bridge = new CapturingAgySDKBridge(pythonManager);
+        CapturingAgySDKBridge bridge = new CapturingAgySDKBridge(pythonManager, () -> "gemini-env-key");
         bridge.setSessionId("agy-session-for-permissions");
 
         Map<String, String> env = bridge.buildEnvironmentForTest("{}");
@@ -75,6 +76,7 @@ public class AgySDKBridgeTest {
                 pythonManager.getVenvPython(SdkDefinition.AGY_SDK.getId()).toString(),
                 env.get("AGY_PYTHON_PATH")
         );
+        assertEquals("gemini-env-key", env.get("GEMINI_API_KEY"));
         assertEquals("agy-session-for-permissions", env.get("CLAUDE_SESSION_ID"));
         assertTrue(env.containsKey("CLAUDE_PERMISSION_DIR"));
         assertFalse(env.get("CLAUDE_PERMISSION_DIR").isBlank());
@@ -115,7 +117,11 @@ public class AgySDKBridgeTest {
         private String capturedStdinJson;
 
         private CapturingAgySDKBridge(PythonDependencyManager pythonDependencyManager) {
-            super(pythonDependencyManager);
+            this(pythonDependencyManager, () -> "");
+        }
+
+        private CapturingAgySDKBridge(PythonDependencyManager pythonDependencyManager, java.util.function.Supplier<String> apiKeySupplier) {
+            super(pythonDependencyManager, apiKeySupplier);
         }
 
         private String providerNameForTest() {

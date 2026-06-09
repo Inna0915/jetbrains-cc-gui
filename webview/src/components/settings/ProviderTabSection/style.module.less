@@ -104,6 +104,46 @@
   }
 }
 
+.agyCredentialBlock {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 6px;
+}
+
+.agyCredentialHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.agyCredentialLabel {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.agyCredentialStatus {
+  margin-left: auto;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.agyCredentialInput {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  color: var(--input-foreground, var(--text-primary));
+  background: var(--input-background, var(--bg-primary));
+  border: 1px solid var(--input-border, var(--border-secondary));
+  border-radius: 4px;
+  font-size: 12px;
+}
+
 /* Responsive */
 @media (max-width: 480px) {
   .providerTabSection {
@@ -123,5 +163,14 @@
   .tabBtn {
     padding: 6px 12px;
     font-size: 12px;
+  }
+
+  .agyCredentialHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .agyCredentialStatus {
+    margin-left: 0;
   }
 }

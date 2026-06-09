@@ -66,6 +66,8 @@ public class SettingsHandler extends BaseMessageHandler {
         "set_commit_ai_config",
         "get_prompt_enhancer_config",
         "set_prompt_enhancer_config",
+        "get_agy_config",
+        "set_agy_config",
         "get_project_commit_prompt",
         "set_project_commit_prompt",
         "get_input_history",
@@ -238,6 +240,12 @@ public class SettingsHandler extends BaseMessageHandler {
                 return true;
             case "set_prompt_enhancer_config":
                 projectConfigHandler.handleSetPromptEnhancerConfig(content);
+                return true;
+            case "get_agy_config":
+                projectConfigHandler.handleGetAgyConfig();
+                return true;
+            case "set_agy_config":
+                projectConfigHandler.handleSetAgyConfig(content);
                 return true;
             case "get_project_commit_prompt":
                 projectConfigHandler.handleGetProjectCommitPrompt();

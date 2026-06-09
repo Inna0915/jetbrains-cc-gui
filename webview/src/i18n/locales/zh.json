@@ -23,7 +23,8 @@
     "info": "信息",
     "seconds": "秒",
     "minutes": "分",
-    "optional": "可选"
+    "optional": "可选",
+    "clear": "清除"
   },
   "chat": {
     "sendMessage": "给 {{provider}} 发送消息",
@@ -312,6 +313,14 @@
       "claude": "Claude Code",
       "codex": "Codex",
       "agy": "Agy"
+    },
+    "agy": {
+      "geminiApiKey": "Gemini API Key",
+      "configured": "已配置",
+      "notConfigured": "未配置",
+      "keepExistingKey": "留空以保留已有 Key",
+      "enterKey": "输入 Gemini API Key",
+      "saveApiKey": "保存 API Key"
     },
     "pluginModels": {
       "title": "自定义模型",

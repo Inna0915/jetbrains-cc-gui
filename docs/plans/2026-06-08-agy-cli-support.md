@@ -8,7 +8,7 @@
 
 **Tech Stack:** IntelliJ Platform Java 17, Node ESM bridge, Python 3.11+ managed venv, `google-antigravity` 0.1.2, React/Vite/TypeScript webview, JUnit 4, Node test runner, Vitest.
 
-**Real SDK verification, 2026-06-08 / refreshed 2026-06-09:** `agy --version` returns `1.0.6`; `pip index versions google-antigravity` reports only `0.1.2` and marks it latest; `LocalAgentConfig()` from `google-antigravity==0.1.2` defaults `gemini_config.models.default.name` to `gemini-3.5-flash` and `gemini_config.models.image_generation.name` to `gemini-3.1-flash-image-preview`; `agy models` exits 0 with empty stdout on this machine, so the built-in chat model list must stay conservative and user-editable. The SDK exposes `ThinkingLevel` values `minimal`, `low`, `medium`, and `high`; the plugin exposes `low`, `medium`, and `high` for Agy and maps stale `xhigh`/`max` values to `high`. SDK installation is via the PyPI package `google-antigravity`, not by assuming the local `agy.exe` CLI contains the Python SDK. Conversation continuation is supported through `LocalAgentConfig(conversation_id=...)` and CLI `agy --conversation`, but full local history message import is not treated as supported until a stable public reader exists.
+**Real SDK verification, 2026-06-08 / refreshed 2026-06-09:** `agy --version` returns `1.0.6`; `pip index versions google-antigravity` reports only `0.1.2` and marks it latest; `LocalAgentConfig()` from `google-antigravity==0.1.2` defaults `gemini_config.models.default.name` to `gemini-3.5-flash` and `gemini_config.models.image_generation.name` to `gemini-3.1-flash-image-preview`; `agy models` exits 0 with empty stdout on this machine, so the built-in chat model list must stay conservative and user-editable. The SDK exposes `ThinkingLevel` values `minimal`, `low`, `medium`, and `high`; the plugin exposes `low`, `medium`, and `high` for Agy and maps stale `xhigh`/`max` values to `high`. SDK installation is via the PyPI package `google-antigravity`, not by assuming the local `agy.exe` CLI contains the Python SDK. Conversation continuation is supported through `LocalAgentConfig(conversation_id=...)` and CLI `agy --conversation`, but full local history message import is not treated as supported until a stable public reader exists. Auth verification shows the SDK requires `LocalAgentConfig(api_key=...)` / `GeminiConfig(api_key=...)` or `GEMINI_API_KEY`; local `~/.gemini/config/config.json` and `~/.gemini/settings.json` are not sufficient when they do not contain a key. The plugin persists an optional Agy Gemini API key at `.codemoss/config.json` under `agy.geminiApiKey`, never echoes the secret to the webview, and injects it into both the runner stdin `apiKey` and process env `GEMINI_API_KEY`.
 
 ---
 
@@ -1230,6 +1230,15 @@ Expected: prints package/runtime info and exits 0. If no `--version` flag exists
 **Step 3: Run authenticated smoke test**
 
 Only run if Antigravity auth is available on the machine:
+
+```powershell
+$payload = '{"message":"List the files in the current directory.","cwd":"G:\\code\\vscode\\jetbrains-cc-gui","permissionMode":"plan","model":"","conversationId":"","apiKey":"<gemini-api-key>"}'
+$payload | node ai-bridge/channel-manager.js agy send
+```
+
+Or configure the plugin key in Settings -> Providers -> Agy -> Gemini API key, which persists to `.codemoss/config.json` and is passed to the SDK as both stdin `apiKey` and `GEMINI_API_KEY`.
+
+For environment-only testing:
 
 ```powershell
 $payload = '{"message":"List the files in the current directory.","cwd":"G:\\code\\vscode\\jetbrains-cc-gui","permissionMode":"plan","model":"","conversationId":""}'

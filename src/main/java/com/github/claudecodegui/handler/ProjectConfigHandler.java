@@ -386,6 +386,32 @@ public class ProjectConfigHandler {
             "projectConfig.promptEnhancer.saveFailed");
     }
 
+    public void handleGetAgyConfig() {
+        try {
+            pushJson("window.updateAgyConfig", settingsService.getAgyConfig());
+        } catch (Exception e) {
+            LOG.error("[ProjectConfigHandler] Failed to get Agy config: " + e.getMessage(), e);
+            JsonObject fallback = new JsonObject();
+            fallback.addProperty("hasGeminiApiKey", false);
+            fallback.addProperty("hasEnvironmentGeminiApiKey", false);
+            pushJson("window.updateAgyConfig", fallback);
+        }
+    }
+
+    public void handleSetAgyConfig(String content) {
+        try {
+            JsonObject json = gson.fromJson(content, JsonObject.class);
+            String geminiApiKey = readString(json, "geminiApiKey", "");
+            settingsService.setAgyGeminiApiKey(geminiApiKey);
+            pushJson("window.updateAgyConfig", settingsService.getAgyConfig());
+            ApplicationManager.getApplication().invokeLater(() ->
+                    context.callJavaScript("window.showSuccessI18n", "toast.saveSuccess"));
+        } catch (Exception e) {
+            LOG.error("[ProjectConfigHandler] Failed to set Agy config: " + e.getMessage(), e);
+            showError("Failed to save Agy config: " + e.getMessage());
+        }
+    }
+
     public void handleGetCommitAiConfig() {
         try {
             pushJson("window.updateCommitAiConfig", settingsService.getCommitAiConfig());

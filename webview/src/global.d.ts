@@ -588,6 +588,11 @@ interface Window {
    */
   updateCurrentCodexConfig?: (json: string) => void;
 
+  /**
+   * Update Agy provider configuration status.
+   */
+  updateAgyConfig?: (json: string) => void;
+
 // ============================================================================
   // Streaming Callbacks
   // ============================================================================

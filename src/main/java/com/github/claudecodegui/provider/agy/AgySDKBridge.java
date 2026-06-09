@@ -7,6 +7,7 @@ import com.github.claudecodegui.provider.common.BaseSDKBridge;
 import com.github.claudecodegui.provider.common.MessageCallback;
 import com.github.claudecodegui.provider.common.SDKResult;
 import com.github.claudecodegui.session.ClaudeSession;
+import com.github.claudecodegui.settings.CodemossSettingsService;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 /**
  * Agy SDK bridge.
@@ -25,14 +27,23 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class AgySDKBridge extends BaseSDKBridge {
     private final PythonDependencyManager pythonDependencyManager;
+    private final Supplier<String> geminiApiKeySupplier;
 
     public AgySDKBridge() {
-        this(new PythonDependencyManager(new DependencyManager().getDependenciesDir()));
+        this(
+                new PythonDependencyManager(new DependencyManager().getDependenciesDir()),
+                AgySDKBridge::loadConfiguredGeminiApiKey
+        );
     }
 
     AgySDKBridge(PythonDependencyManager pythonDependencyManager) {
+        this(pythonDependencyManager, AgySDKBridge::loadConfiguredGeminiApiKey);
+    }
+
+    AgySDKBridge(PythonDependencyManager pythonDependencyManager, Supplier<String> geminiApiKeySupplier) {
         super(AgySDKBridge.class);
         this.pythonDependencyManager = pythonDependencyManager;
+        this.geminiApiKeySupplier = geminiApiKeySupplier;
     }
 
     @Override
@@ -45,6 +56,10 @@ public class AgySDKBridge extends BaseSDKBridge {
         env.put("AGY_USE_STDIN", "true");
         Path pythonPath = pythonDependencyManager.getVenvPython(SdkDefinition.AGY_SDK.getId());
         env.put("AGY_PYTHON_PATH", pythonPath.toString());
+        String apiKey = resolveGeminiApiKey();
+        if (!apiKey.isEmpty()) {
+            env.put("GEMINI_API_KEY", apiKey);
+        }
     }
 
     @Override
@@ -109,6 +124,10 @@ public class AgySDKBridge extends BaseSDKBridge {
         stdinInput.addProperty("cwd", cwd != null ? cwd : "");
         stdinInput.addProperty("permissionMode", permissionMode != null ? permissionMode : "default");
         stdinInput.addProperty("model", model != null ? model : "");
+        String apiKey = resolveGeminiApiKey();
+        if (!apiKey.isEmpty()) {
+            stdinInput.addProperty("apiKey", apiKey);
+        }
         stdinInput.add("attachments", buildAttachments(attachments));
         if (agentPrompt != null && !agentPrompt.isEmpty()) {
             stdinInput.addProperty("agentPrompt", agentPrompt);
@@ -120,6 +139,24 @@ public class AgySDKBridge extends BaseSDKBridge {
         String stdinJson = gson.toJson(stdinInput);
         List<String> command = buildBaseCommand("send");
         return executeStreamingCommand(channelId, command, stdinJson, cwd, callback);
+    }
+
+    private String resolveGeminiApiKey() {
+        try {
+            String value = geminiApiKeySupplier != null ? geminiApiKeySupplier.get() : null;
+            return value == null ? "" : value.trim();
+        } catch (Exception e) {
+            LOG.warn("[Agy] Failed to resolve configured Gemini API key: " + e.getMessage());
+            return "";
+        }
+    }
+
+    private static String loadConfiguredGeminiApiKey() {
+        try {
+            return new CodemossSettingsService().getAgyGeminiApiKey();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     public List<JsonObject> getSessionMessages(String sessionId, String cwd) {

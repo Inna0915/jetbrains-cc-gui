@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProviderConfig, CodexProviderConfig } from '../../../types/provider';
 import { STORAGE_KEYS } from '../../../types/provider';
@@ -12,6 +12,7 @@ const BLOCK_STYLE: React.CSSProperties = { display: 'block' };
 const NONE_STYLE: React.CSSProperties = { display: 'none' };
 const ICON_14_STYLE: React.CSSProperties = { fontSize: 14 };
 const FLEX_1_STYLE: React.CSSProperties = { flex: 1 };
+const BUTTON_ROW_STYLE: React.CSSProperties = { display: 'flex', gap: 8, alignItems: 'center' };
 
 type ProviderTab = 'claude' | 'codex' | 'agy';
 
@@ -69,6 +70,31 @@ const ProviderTabSection = ({
   const [modelDialogAddMode, setModelDialogAddMode] = useState(false);
   // Which plugin's models the dialog is editing
   const [dialogTarget, setDialogTarget] = useState<ProviderTab>('claude');
+  const [agyApiKeyInput, setAgyApiKeyInput] = useState('');
+  const [agyConfig, setAgyConfig] = useState({
+    hasGeminiApiKey: false,
+    hasEnvironmentGeminiApiKey: false,
+  });
+
+  useEffect(() => {
+    const previousUpdateAgyConfig = window.updateAgyConfig;
+    window.updateAgyConfig = (jsonStr: string) => {
+      try {
+        const parsed = JSON.parse(jsonStr);
+        setAgyConfig({
+          hasGeminiApiKey: !!parsed?.hasGeminiApiKey,
+          hasEnvironmentGeminiApiKey: !!parsed?.hasEnvironmentGeminiApiKey,
+        });
+        setAgyApiKeyInput('');
+      } catch {
+        setAgyConfig({ hasGeminiApiKey: false, hasEnvironmentGeminiApiKey: false });
+      }
+    };
+    window.sendToJava?.('get_agy_config:');
+    return () => {
+      window.updateAgyConfig = previousUpdateAgyConfig;
+    };
+  }, []);
 
   const openModelDialog = useCallback((target: ProviderTab, addMode = false) => {
     setDialogTarget(target);
@@ -79,6 +105,19 @@ const ProviderTabSection = ({
   const closeModelDialog = useCallback(() => {
     setModelDialogOpen(false);
     setModelDialogAddMode(false);
+  }, []);
+
+  const saveAgyApiKey = useCallback(() => {
+    const normalizedApiKey = agyApiKeyInput.trim();
+    if (!normalizedApiKey) {
+      return;
+    }
+    window.sendToJava?.(`set_agy_config:${JSON.stringify({ geminiApiKey: normalizedApiKey })}`);
+  }, [agyApiKeyInput]);
+
+  const clearAgyApiKey = useCallback(() => {
+    setAgyApiKeyInput('');
+    window.sendToJava?.('set_agy_config:{"geminiApiKey":""}');
   }, []);
 
   const activeModels =
@@ -196,6 +235,46 @@ const ProviderTabSection = ({
       </div>
 
       <div id="panel-agy-providers" role="tabpanel" style={activeTab === 'agy' ? BLOCK_STYLE : NONE_STYLE}>
+        <div className={styles.agyCredentialBlock}>
+          <div className={styles.agyCredentialHeader}>
+            <label htmlFor="agy-gemini-api-key" className={styles.agyCredentialLabel}>
+              {t('settings.agy.geminiApiKey', { defaultValue: 'Gemini API key' })}
+            </label>
+            <span className={styles.agyCredentialStatus}>
+              {agyConfig.hasGeminiApiKey || agyConfig.hasEnvironmentGeminiApiKey
+                ? t('settings.agy.configured', { defaultValue: 'Configured' })
+                : t('settings.agy.notConfigured', { defaultValue: 'Not configured' })}
+            </span>
+          </div>
+          <div style={BUTTON_ROW_STYLE}>
+            <input
+              id="agy-gemini-api-key"
+              className={styles.agyCredentialInput}
+              type="password"
+              value={agyApiKeyInput}
+              onChange={(e) => setAgyApiKeyInput(e.target.value)}
+              autoComplete="off"
+              placeholder={
+                agyConfig.hasGeminiApiKey
+                  ? t('settings.agy.keepExistingKey', { defaultValue: 'Leave blank to keep existing key' })
+                  : t('settings.agy.enterKey', { defaultValue: 'Enter Gemini API key' })
+              }
+            />
+            <button
+              className={styles.pluginModelsManageBtn}
+              onClick={saveAgyApiKey}
+              disabled={!agyApiKeyInput.trim()}
+            >
+              {t('settings.agy.saveApiKey', { defaultValue: 'Save API Key' })}
+            </button>
+            {(agyConfig.hasGeminiApiKey || agyApiKeyInput) && (
+              <button className={styles.pluginModelsManageBtn} onClick={clearAgyApiKey}>
+                {t('common.clear', { defaultValue: 'Clear' })}
+              </button>
+            )}
+          </div>
+        </div>
+
         <div
           className={styles.pluginModelsRow}
           onClick={() => openModelDialog('agy')}

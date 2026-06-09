@@ -49,6 +49,8 @@ public class CodemossSettingsService {
     public static final String CODEX_RUNTIME_ACCESS_CLI_LOGIN = "cli_login";
     private static final String COMMIT_AI_KEY = "commitAi";
     private static final String PROMPT_ENHANCER_KEY = "promptEnhancer";
+    private static final String AGY_KEY = "agy";
+    private static final String AGY_GEMINI_API_KEY = "geminiApiKey";
     private static final String AI_FEATURE_PROVIDER_KEY = "provider";
     private static final String AI_FEATURE_MODELS_KEY = "models";
     private static final String AI_FEATURE_EFFECTIVE_PROVIDER_KEY = "effectiveProvider";
@@ -278,6 +280,9 @@ public class CodemossSettingsService {
         codex.add("providers", new JsonObject());
         codex.addProperty("localConfigAuthorized", false);
         config.add("codex", codex);
+
+        JsonObject agy = new JsonObject();
+        config.add(AGY_KEY, agy);
 
         return config;
     }
@@ -808,6 +813,62 @@ public class CodemossSettingsService {
 
     public boolean isLocalProviderActive() {
         return providerManager.isLocalProviderActive();
+    }
+
+    // ==================== Agy Config Management ====================
+
+    public JsonObject getAgyConfig() throws IOException {
+        JsonObject config = readConfig();
+        String configuredApiKey = getAgyGeminiApiKey(config);
+
+        JsonObject response = new JsonObject();
+        response.addProperty("hasGeminiApiKey", !configuredApiKey.isEmpty());
+        response.addProperty("hasEnvironmentGeminiApiKey", hasEnvironmentGeminiApiKey());
+        return response;
+    }
+
+    public String getAgyGeminiApiKey() throws IOException {
+        return getAgyGeminiApiKey(readConfig());
+    }
+
+    public void setAgyGeminiApiKey(String apiKey) throws IOException {
+        JsonObject config = readConfig();
+        JsonObject agy = getOrCreateAgyConfig(config);
+        String normalized = apiKey == null ? "" : apiKey.trim();
+        if (normalized.isEmpty()) {
+            agy.remove(AGY_GEMINI_API_KEY);
+        } else {
+            agy.addProperty(AGY_GEMINI_API_KEY, normalized);
+        }
+        config.add(AGY_KEY, agy);
+        writeConfig(config);
+        LOG.info("[CodemossSettings] Updated Agy Gemini API key state: configured=" + !normalized.isEmpty());
+    }
+
+    private JsonObject getOrCreateAgyConfig(JsonObject config) {
+        if (config.has(AGY_KEY) && config.get(AGY_KEY).isJsonObject()) {
+            return config.getAsJsonObject(AGY_KEY);
+        }
+        JsonObject agy = new JsonObject();
+        config.add(AGY_KEY, agy);
+        return agy;
+    }
+
+    private String getAgyGeminiApiKey(JsonObject config) {
+        if (config == null || !config.has(AGY_KEY) || !config.get(AGY_KEY).isJsonObject()) {
+            return "";
+        }
+        JsonObject agy = config.getAsJsonObject(AGY_KEY);
+        if (!agy.has(AGY_GEMINI_API_KEY) || agy.get(AGY_GEMINI_API_KEY).isJsonNull()) {
+            return "";
+        }
+        String value = agy.get(AGY_GEMINI_API_KEY).getAsString();
+        return value == null ? "" : value.trim();
+    }
+
+    private boolean hasEnvironmentGeminiApiKey() {
+        String value = System.getenv("GEMINI_API_KEY");
+        return value != null && !value.trim().isEmpty();
     }
 
     // ==================== MCP Server Management ====================

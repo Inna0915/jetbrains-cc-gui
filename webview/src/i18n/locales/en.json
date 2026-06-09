@@ -23,7 +23,8 @@
     "info": "Info",
     "seconds": "s",
     "minutes": "m",
-    "optional": "Optional"
+    "optional": "Optional",
+    "clear": "Clear"
   },
   "chat": {
     "sendMessage": "Send message to {{provider}}",
@@ -312,6 +313,14 @@
       "claude": "Claude Code",
       "codex": "Codex",
       "agy": "Agy"
+    },
+    "agy": {
+      "geminiApiKey": "Gemini API key",
+      "configured": "Configured",
+      "notConfigured": "Not configured",
+      "keepExistingKey": "Leave blank to keep existing key",
+      "enterKey": "Enter Gemini API key",
+      "saveApiKey": "Save API Key"
     },
     "pluginModels": {
       "title": "Custom Models",

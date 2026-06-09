@@ -12,7 +12,7 @@ except ImportError:  # pragma: no cover - depends on local SDK availability
 sys.path.insert(0, os.path.dirname(__file__))
 
 from permission_ipc import parse_permission_response  # noqa: E402
-from permission_policy import build_config, normalize_mode  # noqa: E402
+from permission_policy import build_config, normalize_mode, normalize_thinking_level  # noqa: E402
 
 
 class AgyPermissionPolicyTest(unittest.TestCase):
@@ -48,6 +48,41 @@ class AgyPermissionPolicyTest(unittest.TestCase):
         self.assertEqual(cfg.conversation_id, "abc")
         self.assertEqual(cfg.model, "gemini-3-pro")
         self.assertGreaterEqual(len(cfg.policies), 3)
+
+    def test_thinking_level_uses_gemini_generation_config(self):
+        cfg = build_config(
+            "default",
+            cwd="C:\\work",
+            conversation_id=None,
+            model="gemini-3.5-flash",
+            reasoning_effort="medium",
+        )
+
+        self.assertIsNone(cfg.model)
+        self.assertEqual(cfg.gemini_config.models.default.name, "gemini-3.5-flash")
+        self.assertEqual(cfg.gemini_config.models.default.generation.thinking_level.value, "medium")
+
+    def test_thinking_level_without_model_uses_verified_default_model(self):
+        cfg = build_config(
+            "default",
+            cwd="C:\\work",
+            conversation_id=None,
+            model="",
+            reasoning_effort="high",
+        )
+
+        self.assertIsNone(cfg.model)
+        self.assertEqual(cfg.gemini_config.models.default.name, "gemini-3.5-flash")
+        self.assertEqual(cfg.gemini_config.models.default.generation.thinking_level.value, "high")
+
+    def test_normalize_thinking_level_matches_sdk_values(self):
+        self.assertIsNone(normalize_thinking_level(None))
+        self.assertEqual(normalize_thinking_level("low"), "low")
+        self.assertEqual(normalize_thinking_level("medium"), "medium")
+        self.assertEqual(normalize_thinking_level("high"), "high")
+        self.assertEqual(normalize_thinking_level("xhigh"), "high")
+        self.assertEqual(normalize_thinking_level("max"), "high")
+        self.assertIsNone(normalize_thinking_level("turbo"))
 
     def test_bypass_is_unrestricted(self):
         cfg = build_config("bypassPermissions", cwd="C:\\work", conversation_id=None, model="")

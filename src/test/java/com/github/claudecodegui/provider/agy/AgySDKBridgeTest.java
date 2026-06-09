@@ -46,6 +46,7 @@ public class AgySDKBridgeTest {
                 "plan",
                 "gemini-3-pro",
                 "Stay concise",
+                "medium",
                 new NoopCallback()
         ).join();
 
@@ -56,6 +57,7 @@ public class AgySDKBridgeTest {
         assertEquals("plan", payload.get("permissionMode").getAsString());
         assertEquals("gemini-3-pro", payload.get("model").getAsString());
         assertEquals("Stay concise", payload.get("agentPrompt").getAsString());
+        assertEquals("medium", payload.get("reasoningEffort").getAsString());
         assertTrue(bridge.capturedCommand.contains("agy"));
         assertTrue(bridge.capturedCommand.contains("send"));
     }

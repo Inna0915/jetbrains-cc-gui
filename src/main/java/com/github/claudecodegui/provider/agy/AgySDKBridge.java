@@ -100,6 +100,7 @@ public class AgySDKBridge extends BaseSDKBridge {
             String permissionMode,
             String model,
             String agentPrompt,
+            String reasoningEffort,
             MessageCallback callback
     ) {
         JsonObject stdinInput = new JsonObject();
@@ -111,6 +112,9 @@ public class AgySDKBridge extends BaseSDKBridge {
         stdinInput.add("attachments", buildAttachments(attachments));
         if (agentPrompt != null && !agentPrompt.isEmpty()) {
             stdinInput.addProperty("agentPrompt", agentPrompt);
+        }
+        if (reasoningEffort != null && !reasoningEffort.isEmpty()) {
+            stdinInput.addProperty("reasoningEffort", reasoningEffort);
         }
 
         String stdinJson = gson.toJson(stdinInput);

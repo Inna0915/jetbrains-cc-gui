@@ -56,6 +56,7 @@ public class SessionSendServiceTest {
         state.setCwd("G:\\code\\project");
         state.setPermissionMode("plan");
         state.setModel("gemini-3-pro");
+        state.setReasoningEffort("medium");
 
         RecordingClaudeBridge claudeBridge = new RecordingClaudeBridge();
         RecordingCodexBridge codexBridge = new RecordingCodexBridge();
@@ -90,6 +91,7 @@ public class SessionSendServiceTest {
         assertEquals("plan", agyBridge.permissionMode);
         assertEquals("gemini-3-pro", agyBridge.model);
         assertEquals("Agent instructions", agyBridge.agentPrompt);
+        assertEquals("medium", agyBridge.reasoningEffort);
         assertEquals(0, claudeBridge.sendCount);
         assertEquals(0, codexBridge.sendCount);
     }
@@ -158,6 +160,7 @@ public class SessionSendServiceTest {
         private String permissionMode;
         private String model;
         private String agentPrompt;
+        private String reasoningEffort;
 
         @Override
         public CompletableFuture<SDKResult> sendMessage(
@@ -169,6 +172,7 @@ public class SessionSendServiceTest {
                 String permissionMode,
                 String model,
                 String agentPrompt,
+                String reasoningEffort,
                 MessageCallback callback
         ) {
             sendCount++;
@@ -178,6 +182,7 @@ public class SessionSendServiceTest {
             this.permissionMode = permissionMode;
             this.model = model;
             this.agentPrompt = agentPrompt;
+            this.reasoningEffort = reasoningEffort;
             return CompletableFuture.completedFuture(SDKResult.success("agy"));
         }
     }

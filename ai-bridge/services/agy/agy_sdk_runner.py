@@ -198,6 +198,7 @@ async def run(payload: dict[str, Any], emit: Emit = _default_emit) -> int:
         save_dir=payload.get("saveDir") or None,
         api_key=payload.get("apiKey") or None,
         system_instructions=payload.get("agentPrompt") or None,
+        reasoning_effort=payload.get("reasoningEffort") or None,
     )
 
     emit("[MESSAGE_START]")

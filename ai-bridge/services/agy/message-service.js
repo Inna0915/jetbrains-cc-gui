@@ -42,7 +42,8 @@ export function buildAgyStdinPayload({
   apiKey,
   attachments,
   saveDir,
-  agentPrompt
+  agentPrompt,
+  reasoningEffort
 }) {
   return {
     message: message || '',
@@ -53,7 +54,8 @@ export function buildAgyStdinPayload({
     apiKey: apiKey || null,
     attachments: Array.isArray(attachments) ? attachments : [],
     saveDir: saveDir || null,
-    agentPrompt: agentPrompt || null
+    agentPrompt: agentPrompt || null,
+    reasoningEffort: reasoningEffort || null
   };
 }
 
@@ -125,7 +127,8 @@ export async function sendMessage(
     apiKey,
     attachments,
     saveDir: options.saveDir,
-    agentPrompt: options.agentPrompt
+    agentPrompt: options.agentPrompt,
+    reasoningEffort: options.reasoningEffort
   });
   return runAgyRunner(payload, options);
 }

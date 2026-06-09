@@ -68,4 +68,23 @@ describe('ReasoningSelect', () => {
 
     expect(screen.queryByRole('button')).toBeNull();
   });
+
+  it('shows only SDK-supported thinking levels for Agy', () => {
+    render(
+      <ReasoningSelect
+        value="high"
+        onChange={vi.fn()}
+        currentProvider="agy"
+        selectedModel="gemini-3.5-flash"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button'));
+
+    expect(screen.getByText('Low')).toBeTruthy();
+    expect(screen.getByText('Medium')).toBeTruthy();
+    expect(screen.getAllByText('High').length).toBeGreaterThan(0);
+    expect(screen.queryByText('XHigh')).toBeNull();
+    expect(screen.queryByText('Max')).toBeNull();
+  });
 });

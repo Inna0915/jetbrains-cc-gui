@@ -76,6 +76,12 @@ const SDK_DEFINITIONS = [
     description: 'settings.dependency.codexSdkDescription',
     relatedProviders: ['openai'],
   },
+  {
+    id: 'agy-sdk' as SdkId,
+    nameKey: 'settings.dependency.agySdkName',
+    description: 'settings.dependency.agySdkDescription',
+    relatedProviders: ['agy'],
+  },
 ];
 
 const VersionSelect = ({

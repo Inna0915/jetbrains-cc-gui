@@ -19,7 +19,8 @@ export async function handleAgyCommand(command, args, stdinData) {
           attachments,
           pythonPath,
           saveDir,
-          agentPrompt
+          agentPrompt,
+          reasoningEffort
         } = stdinData;
         await agySendMessage(
           message,
@@ -29,7 +30,7 @@ export async function handleAgyCommand(command, args, stdinData) {
           model || '',
           apiKey || '',
           attachments || [],
-          { pythonPath, saveDir, agentPrompt }
+          { pythonPath, saveDir, agentPrompt, reasoningEffort }
         );
       } else {
         await agySendMessage(args[0], args[1], args[2], args[3], args[4]);

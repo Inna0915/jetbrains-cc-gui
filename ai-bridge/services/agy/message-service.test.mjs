@@ -19,13 +19,15 @@ test('buildAgyStdinPayload normalizes permission mode and conversation id', () =
     threadId: 'thread-1',
     cwd: 'C:/work',
     permissionMode: '',
-    model: 'gemini-3-pro'
+    model: 'gemini-3-pro',
+    reasoningEffort: 'medium'
   });
 
   assert.equal(payload.message, 'hello');
   assert.equal(payload.conversationId, 'thread-1');
   assert.equal(payload.permissionMode, 'default');
   assert.equal(payload.model, 'gemini-3-pro');
+  assert.equal(payload.reasoningEffort, 'medium');
 });
 
 test('buildAgyRunnerInvocation points at agy_sdk_runner.py', () => {

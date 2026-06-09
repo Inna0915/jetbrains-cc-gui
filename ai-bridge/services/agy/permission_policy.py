@@ -4,9 +4,12 @@ from typing import Any
 
 from google.antigravity import CapabilitiesConfig, LocalAgentConfig
 from google.antigravity.hooks import policy
-from google.antigravity.types import BuiltinTools
+from google.antigravity.types import BuiltinTools, GeminiConfig, GenerationConfig, ModelConfig, ModelEntry
 
 from permission_ipc import request_permission
+
+
+DEFAULT_TEXT_MODEL = "gemini-3.5-flash"
 
 
 def normalize_mode(mode: str | None) -> str:
@@ -20,8 +23,37 @@ def normalize_mode(mode: str | None) -> str:
     return "default"
 
 
+def normalize_thinking_level(value: str | None) -> str | None:
+    normalized = (value or "").strip()
+    if normalized in ("low", "medium", "high"):
+        return normalized
+    if normalized in ("xhigh", "max"):
+        return "high"
+    return None
+
+
 def _compact_kwargs(values: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in values.items() if value is not None}
+
+
+def _build_model_kwargs(model: str | None, reasoning_effort: str | None) -> dict[str, Any]:
+    thinking_level = normalize_thinking_level(reasoning_effort)
+    model_name = model or None
+    if thinking_level is None:
+        return {"model": model_name}
+
+    generation = GenerationConfig(thinking_level=thinking_level)
+    model_entry_kwargs = {
+        "name": model_name or DEFAULT_TEXT_MODEL,
+        "generation": generation,
+    }
+
+    return {
+        "model": None,
+        "gemini_config": GeminiConfig(
+            models=ModelConfig(default=ModelEntry(**model_entry_kwargs))
+        ),
+    }
 
 
 def _tool_call_value(tool_call: Any, *names: str) -> Any:
@@ -67,14 +99,15 @@ def build_config(
     api_key: str | None = None,
     gui_handler: Any = None,
     system_instructions: str | None = None,
+    reasoning_effort: str | None = None,
 ) -> LocalAgentConfig:
     normalized = normalize_mode(mode)
     kwargs = _compact_kwargs({
         "conversation_id": conversation_id or None,
-        "model": model or None,
         "save_dir": save_dir,
         "api_key": api_key,
         "system_instructions": system_instructions,
+        **_build_model_kwargs(model, reasoning_effort),
     })
 
     if normalized == "plan":

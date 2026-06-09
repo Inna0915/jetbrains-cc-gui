@@ -41,7 +41,8 @@ describe('ButtonArea Agy models', () => {
 
     const modelList = screen.getByTestId('model-list').textContent ?? '';
     expect(modelList).toContain('gemini-custom:Gemini Custom');
-    expect(modelList).toContain('gemini-3-pro:Gemini 3 Pro');
+    expect(modelList).toContain('gemini-3.5-flash:Gemini 3.5 Flash');
+    expect(modelList).not.toContain('gemini-3-pro:Gemini 3 Pro');
     expect(modelList).not.toContain('claude-sonnet-4-6');
   });
 });

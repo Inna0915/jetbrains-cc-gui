@@ -6,7 +6,9 @@
 
 **Architecture:** Keep the existing Java -> Node bridge shape and add an `agy` provider channel. Java spawns `ai-bridge/channel-manager.js agy send`; Node spawns a managed Python venv runner; the runner uses `LocalAgentConfig`, maps SDK chunks to the existing line protocol, and reuses the existing file-based permission IPC.
 
-**Tech Stack:** IntelliJ Platform Java 17, Node ESM bridge, Python 3.11+ managed venv, `google-antigravity` 0.1.2+, React/Vite/TypeScript webview, JUnit 4, Node test runner, Vitest.
+**Tech Stack:** IntelliJ Platform Java 17, Node ESM bridge, Python 3.11+ managed venv, `google-antigravity` 0.1.2, React/Vite/TypeScript webview, JUnit 4, Node test runner, Vitest.
+
+**Real SDK verification, 2026-06-08 / refreshed 2026-06-09:** `agy --version` returns `1.0.6`; `pip index versions google-antigravity` reports only `0.1.2` and marks it latest; `LocalAgentConfig()` from `google-antigravity==0.1.2` defaults `gemini_config.models.default.name` to `gemini-3.5-flash` and `gemini_config.models.image_generation.name` to `gemini-3.1-flash-image-preview`; `agy models` exits 0 with empty stdout on this machine, so the built-in chat model list must stay conservative and user-editable. The SDK exposes `ThinkingLevel` values `minimal`, `low`, `medium`, and `high`; the plugin exposes `low`, `medium`, and `high` for Agy and maps stale `xhigh`/`max` values to `high`. SDK installation is via the PyPI package `google-antigravity`, not by assuming the local `agy.exe` CLI contains the Python SDK. Conversation continuation is supported through `LocalAgentConfig(conversation_id=...)` and CLI `agy --conversation`, but full local history message import is not treated as supported until a stable public reader exists.
 
 ---
 
@@ -81,11 +83,11 @@ Add a conservative model list:
 
 ```ts
 export const AGY_MODELS: ModelInfo[] = [
-  { id: 'gemini-3-pro', label: 'Gemini 3 Pro', description: 'Antigravity default coding model.' },
+  { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', description: 'Antigravity SDK default coding model.' },
 ];
 ```
 
-If the exact default changes during implementation, keep this list user-editable through custom models.
+This value is verified from `google.antigravity.LocalAgentConfig()` in `google-antigravity==0.1.2`. Do not add the image generation model to the chat selector unless the SDK or CLI exposes it as a chat model. Keep the list user-editable through custom models because the SDK accepts arbitrary model strings via `LocalAgentConfig(model=...)`.
 
 **Step 4: Run tests and verify pass**
 
@@ -119,7 +121,7 @@ Cover:
 ```ts
 localStorage.setItem('model-selection-state', JSON.stringify({
   provider: 'agy',
-  agyModel: 'gemini-3-pro',
+  agyModel: 'gemini-3.5-flash',
   agyPermissionMode: 'plan',
 }));
 ```
@@ -128,7 +130,7 @@ Expected behavior:
 
 - `setCurrentProvider('agy')` is called.
 - `setPermissionMode('plan')` is called.
-- backend sync sends `set_provider: agy`, `set_model: gemini-3-pro`, and `set_mode: plan`.
+- backend sync sends `set_provider: agy`, `set_model: gemini-3.5-flash`, and `set_mode: plan`.
 
 **Step 2: Run tests and verify failure**
 
@@ -183,6 +185,8 @@ git commit -m "feat: persist agy provider state"
 ## Task 3: Fix SDK Install Gating and Slash Commands for Agy
 
 **Files:**
+- Modify: `webview/src/components/settings/DependencySection/index.tsx`
+- Modify: `webview/src/components/settings/DependencySection/index.test.tsx`
 - Modify: `webview/src/hooks/providers/useUsageTracking.ts`
 - Modify: `webview/src/hooks/useMessageSender.ts`
 - Modify: `webview/src/hooks/useMessageSender.context.test.ts`
@@ -209,6 +213,17 @@ For missing SDK warning:
 currentProvider = 'agy';
 currentSdkInstalled = false;
 expect(addToast).toHaveBeenCalledWith(expect.stringContaining('Agy'), 'warning');
+```
+
+For dependency UI installation:
+
+```ts
+expect(screen.getByText('Antigravity Python SDK')).toBeTruthy();
+expect(screen.getByText('Agy AI 提供商所需。包含 google-antigravity Python SDK。')).toBeTruthy();
+fireEvent.click(screen.getByRole('button', { name: '安装 v0.1.2' }));
+expect(window.sendToJava).toHaveBeenCalledWith(
+  'install_dependency:{"id":"agy-sdk","version":"0.1.2"}',
+);
 ```
 
 **Step 2: Run tests and verify failure**
@@ -259,6 +274,19 @@ Use provider display name helper:
 const providerName = currentProvider === 'codex' ? 'Codex' :
   currentProvider === 'agy' ? 'Agy' : 'Claude Code';
 ```
+
+Render the Agy install entry in `DependencySection`:
+
+```ts
+{
+  id: 'agy-sdk' as SdkId,
+  nameKey: 'settings.dependency.agySdkName',
+  description: 'settings.dependency.agySdkDescription',
+  relatedProviders: ['agy'],
+}
+```
+
+Add matching i18n keys in all locale files so the visible install route is `Settings -> Dependencies -> Antigravity Python SDK -> Install`. The backend install payload remains `install_dependency:{"id":"agy-sdk","version":"0.1.2"}` and Java installs pip package `google-antigravity` into `~/.codemoss/dependencies/agy-sdk/.venv`.
 
 **Step 4: Run tests and verify pass**
 
@@ -1178,7 +1206,7 @@ Run through UI or command line:
 .\gradlew.bat runIde -PskipWebview=false
 ```
 
-Then use Settings -> Dependencies -> install `agy-sdk`.
+Then use Settings -> Dependencies -> Antigravity Python SDK -> Install. This sends `install_dependency` for `agy-sdk`; Java creates `~/.codemoss/dependencies/agy-sdk/.venv` and installs pip package `google-antigravity`.
 
 If testing from terminal:
 
@@ -1307,7 +1335,9 @@ If the Python SDK integration is unstable:
 
 - `agy` appears as an enabled provider.
 - Missing `agy-sdk` blocks sending and opens Dependencies settings.
+- Dependencies settings visibly lists `Antigravity Python SDK` and its install action sends `install_dependency` with id `agy-sdk`.
 - Installing `agy-sdk` creates a managed venv under `~/.codemoss/dependencies/agy-sdk/.venv`.
+- Agy built-in chat models match the verified SDK default: `gemini-3.5-flash`. Other Agy model ids are supported through custom models.
 - `agy` messages route to `AgySDKBridge`, not Claude.
 - Python runner imports `google.antigravity` from the managed venv.
 - Streaming text, thinking, tool calls, and session id reach the webview.

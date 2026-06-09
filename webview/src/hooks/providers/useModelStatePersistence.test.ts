@@ -12,7 +12,7 @@ describe('useModelStatePersistence', () => {
   it('restores agy provider state and syncs it to the backend', () => {
     localStorage.setItem('model-selection-state', JSON.stringify({
       provider: 'agy',
-      agyModel: 'gemini-3-pro',
+      agyModel: 'gemini-3.5-flash',
       agyPermissionMode: 'plan',
     }));
 
@@ -41,7 +41,7 @@ describe('useModelStatePersistence', () => {
       currentProvider: 'claude',
       selectedClaudeModel: 'claude-sonnet-4-6',
       selectedCodexModel: 'gpt-5.5',
-      selectedAgyModel: 'gemini-3-pro',
+      selectedAgyModel: 'gemini-3.5-flash',
       claudePermissionMode: 'bypassPermissions',
       codexPermissionMode: 'default',
       agyPermissionMode: 'plan',
@@ -50,14 +50,14 @@ describe('useModelStatePersistence', () => {
     }));
 
     expect(setCurrentProvider).toHaveBeenCalledWith('agy');
-    expect(setSelectedAgyModel).toHaveBeenCalledWith('gemini-3-pro');
+    expect(setSelectedAgyModel).toHaveBeenCalledWith('gemini-3.5-flash');
     expect(setAgyPermissionMode).toHaveBeenCalledWith('plan');
     expect(setPermissionMode).toHaveBeenCalledWith('plan');
 
     vi.advanceTimersByTime(250);
 
     expect(window.sendToJava).toHaveBeenCalledWith('set_provider:agy');
-    expect(window.sendToJava).toHaveBeenCalledWith('set_model:gemini-3-pro');
+    expect(window.sendToJava).toHaveBeenCalledWith('set_model:gemini-3.5-flash');
     expect(window.sendToJava).toHaveBeenCalledWith('set_mode:plan');
   });
 });

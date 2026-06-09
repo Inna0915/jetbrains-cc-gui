@@ -276,6 +276,8 @@
       "claudeSdkDescription": "Claude AI 功能所需。包含 Claude Code SDK 及相關依賴。",
       "codexSdkName": "Codex SDK",
       "codexSdkDescription": "Codex AI 功能所需。包含 OpenAI Codex SDK。",
+      "agySdkName": "Antigravity Python SDK",
+      "agySdkDescription": "Agy AI 提供商所需。包含 google-antigravity Python SDK。",
       "loading": "正在載入依賴狀態...",
       "install": "安裝",
       "installing": "安裝中...",

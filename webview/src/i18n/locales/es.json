@@ -276,6 +276,8 @@
       "claudeSdkDescription": "Requerido para funciones de Claude AI. Incluye Claude Code SDK y dependencias relacionadas.",
       "codexSdkName": "Codex SDK",
       "codexSdkDescription": "Requerido para funciones de Codex AI. Incluye OpenAI Codex SDK.",
+      "agySdkName": "Antigravity Python SDK",
+      "agySdkDescription": "Requerido para funciones de Agy AI. Incluye el SDK de Python google-antigravity.",
       "loading": "Cargando estado de dependencias...",
       "install": "Instalar",
       "installing": "Instalando...",

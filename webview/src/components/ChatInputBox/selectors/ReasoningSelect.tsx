@@ -32,6 +32,7 @@ interface ReasoningSelectProps {
  * Controls the depth of reasoning for AI models.
  * Visibility and available levels depend on the selected model:
  * - Codex: low/medium/high/xhigh
+ * - Agy: low/medium/high
  * - Claude Opus 4.7: low/medium/high/xhigh/max
  * - Claude Opus 4.6 and Sonnet 4.6: low/medium/high/max
  * - Claude Haiku 4.5 and legacy models: hidden (no adaptive thinking support)
@@ -47,6 +48,9 @@ export const ReasoningSelect = ({ value, onChange, disabled, selectedModel, curr
 
   // Build the list of available levels for the current model
   const availableLevels = REASONING_LEVELS.filter(level => {
+    if (currentProvider === 'agy') {
+      return level.id === 'low' || level.id === 'medium' || level.id === 'high';
+    }
     if (currentProvider !== 'claude') {
       return level.id !== 'max';
     }
@@ -62,7 +66,8 @@ export const ReasoningSelect = ({ value, onChange, disabled, selectedModel, curr
     return true;
   });
 
-  const currentLevel = availableLevels.find(l => l.id === value) || availableLevels[availableLevels.length - 2] || availableLevels[0];
+  const fallbackLevel = availableLevels.find(l => l.id === 'high') || availableLevels[availableLevels.length - 2] || availableLevels[0];
+  const currentLevel = availableLevels.find(l => l.id === value) || fallbackLevel;
 
   useEffect(() => {
     if (!isVisible || availableLevels.some(level => level.id === value)) {

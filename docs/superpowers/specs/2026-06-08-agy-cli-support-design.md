@@ -80,6 +80,18 @@ Local CLI verification:
 
 The design uses the Python SDK for runtime behavior. The CLI remains useful for diagnostics and user setup messaging, but it is not the main integration path.
 
+Additional verification on June 9, 2026:
+
+- SDK distribution is not treated as built into `agy.exe`. The official SDK README installs with `pip install google-antigravity` and states that the compiled runtime binary is included in platform-specific PyPI wheels; cloning the repo alone is not sufficient.
+- PyPI currently exposes `google-antigravity` `0.1.2` wheels for Windows, Linux, and macOS; `pip index versions google-antigravity` on this machine reported `0.1.2` as both installed and latest.
+- `ThinkingLevel` in the real SDK exposes `minimal`, `low`, `medium`, and `high`.
+- `GenerationConfig(thinking_level="medium")` inside `GeminiConfig(models=ModelConfig(default=ModelEntry(...)))` is accepted by `LocalAgentConfig`; when `gemini_config.models.default` is used, `cfg.model` must stay `None`.
+- The UI exposes `low`, `medium`, and `high` for Agy. Incoming `xhigh` or `max` values are normalized to `high` defensively because the SDK has no corresponding values.
+- `LocalAgentConfig()` default text model is `gemini-3.5-flash`; default image model is `gemini-3.1-flash-image-preview`.
+- `LocalAgentConfig(conversation_id="...")` preserves the id, and `agy --help` exposes `--conversation` and `--continue`, so continuing a known conversation id is supported.
+- Full historical message listing/import is not confirmed as a public SDK/CLI API. The SDK `Agent` exposes an in-process `conversation.history` after messages are exchanged, while local Antigravity CLI storage uses SQLite/protobuf-like trajectory data under `~/.gemini/antigravity-cli/conversations`; the plugin keeps Agy `getSessionMessages()` empty until a stable reader exists.
+- Local config default path is `C:\Users\Administrator\.gemini\antigravity` from `google.antigravity.connections.local.local_connection_config.DEFAULT_APP_DATA_DIR`. On this machine `~/.gemini/antigravity`, `~/.gemini/antigravity/conversations`, `~/.gemini/config/config.json`, `~/.gemini/settings.json`, and `~/.gemini/antigravity-cli/cache/last_conversations.json` are readable; constructing `LocalAgentConfig(workspaces=[repo])` succeeds and installs workspace policies that include the default app data directory.
+
 ## Architecture Decision
 
 Use `Java -> Node bridge -> Python SDK runner`.
@@ -130,6 +142,7 @@ Stdin JSON:
   "cwd": "absolute project path",
   "permissionMode": "default",
   "model": "optional model id",
+  "reasoningEffort": "optional low|medium|high",
   "agentPrompt": "optional agent instructions",
   "attachments": []
 }
@@ -159,6 +172,12 @@ Mapping:
 - `response.usage_metadata` -> `[MESSAGE] {"type":"usage",...}` where feasible
 
 The Java bridge treats `[THREAD_ID]` as the provider session id, the same way Codex treats thread id.
+
+## Model And Thinking Depth
+
+Agy model selection remains conservative because `agy models` exits successfully but prints no model list on this machine. The built-in chat model is the SDK-verified default `gemini-3.5-flash`; users can still provide custom Agy model ids through the existing custom model flow.
+
+Thinking depth is SDK-native, not a UI-only hint. The frontend offers `low`, `medium`, and `high`; Java passes `reasoningEffort` through stdin; Node forwards it unchanged; Python maps it to `GenerationConfig(thinking_level=...)` under `gemini_config.models.default`. If the selected model is empty but thinking depth is set, Python uses the verified default `gemini-3.5-flash`. If stale state sends `xhigh` or `max`, Python normalizes to `high`.
 
 ## Permission Mode Mapping
 
@@ -332,7 +351,7 @@ cd webview; npm test -- --run useMessageSender.context.test.ts useModelProviderS
 .\gradlew.bat buildPlugin -PskipWebview=false
 ```
 
-Implementation verification on June 8, 2026:
+Implementation verification on June 8-9, 2026:
 
 - PASS: `python -m unittest ai-bridge/services/agy/agy_sdk_runner_test.py ai-bridge/services/agy/permission_policy_test.py` using the real `google-antigravity` `0.1.2` venv.
 - PASS: `agy_sdk_runner.py --version` with the real SDK venv.
@@ -340,8 +359,9 @@ Implementation verification on June 8, 2026:
 - PASS: targeted Agy Java tests: `AgySDKBridgeTest`, `SessionSendServiceTest`, `SessionProviderRouterTest`, `AgyMessageHandlerTest`, and `DependencyManagerAgySdkTest`.
 - PASS: Java full test suite, `.\gradlew.bat test -PskipWebview=true`.
 - PASS: Node bridge full test suite, `cd ai-bridge; node --test` with `155` tests.
-- PASS: webview full test suite, `82` files and `636` tests.
-- PASS: `.\gradlew.bat buildPlugin -PskipWebview=false`; plugin package produced at `build/distributions/idea-claude-code-gui-0.4.4.zip`.
+- PASS: real SDK Python suite, `python -m unittest ai-bridge.services.agy.permission_policy_test ai-bridge.services.agy.agy_sdk_runner_test` with `17` tests.
+- PASS: webview full test suite, `82` files and `638` tests plus `tsc -p tsconfig.test.json --noEmit`.
+- PASS: `.\gradlew.bat buildPlugin -PskipWebview=false`; plugin package was built successfully and `ai-bridge.zip` / `ai-bridge.hash` were added to the plugin package.
 - FIXED: Java `NodeDetectorWslTest` now accounts for Unix-style WSL paths on Windows while keeping non-WSL command coverage.
 - FIXED: Node bridge tests now isolate Windows ESM import paths and local Claude provider/model settings from the developer machine.
 - Authenticated live Antigravity chat remains a manual verification step because it requires user credentials/API configuration.

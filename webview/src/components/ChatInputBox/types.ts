@@ -396,9 +396,9 @@ export const CODEX_MODELS: ModelInfo[] = [
  */
 export const AGY_MODELS: ModelInfo[] = [
   {
-    id: 'gemini-3-pro',
-    label: 'Gemini 3 Pro',
-    description: 'Antigravity default coding model.',
+    id: 'gemini-3.5-flash',
+    label: 'Gemini 3.5 Flash',
+    description: 'Antigravity SDK default coding model.',
   },
 ];
 

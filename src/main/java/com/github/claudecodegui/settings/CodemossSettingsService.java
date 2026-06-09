@@ -867,7 +867,11 @@ public class CodemossSettingsService {
     }
 
     private boolean hasEnvironmentGeminiApiKey() {
-        String value = System.getenv("GEMINI_API_KEY");
+        return hasNonBlankEnv("GEMINI_API_KEY") || hasNonBlankEnv("GOOGLE_API_KEY");
+    }
+
+    private boolean hasNonBlankEnv(String name) {
+        String value = System.getenv(name);
         return value != null && !value.trim().isEmpty();
     }
 

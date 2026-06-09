@@ -65,6 +65,7 @@ test('sendMessage writes stdin JSON and forwards stdout', async () => {
 
   await sendMessage('hello', 'thread-1', 'C:/work', 'default', 'gemini-3-pro', '', [], {
     pythonPath: 'python',
+    env: { GEMINI_API_KEY: 'gemini-env-key' },
     spawnImpl,
     stdoutWrite: (chunk) => output.push(chunk)
   });
@@ -74,6 +75,59 @@ test('sendMessage writes stdin JSON and forwards stdout', async () => {
   assert.equal(JSON.parse(stdin).permissionMode, 'default');
   assert.equal(JSON.parse(stdin).conversationId, 'thread-1');
   assert.deepEqual(output, ['[MESSAGE_START]\n']);
+});
+
+test('sendMessage returns a clear error without spawning when no Gemini key is configured', async () => {
+  const output = [];
+  let spawnCalled = false;
+
+  const exitCode = await sendMessage('hello', 'thread-1', 'C:/work', 'default', 'gemini-3-pro', '', [], {
+    env: {},
+    spawnImpl: () => {
+      spawnCalled = true;
+      throw new Error('should not spawn');
+    },
+    stdoutWrite: (chunk) => output.push(chunk)
+  });
+
+  assert.equal(exitCode, 1);
+  assert.equal(spawnCalled, false);
+  assert.equal(output.length, 1);
+  assert.match(output[0], /^\[SEND_ERROR\] /);
+  assert.match(output[0], /Gemini API key is not configured/);
+  assert.match(output[0], /Settings > Providers > Agy/);
+});
+
+test('sendMessage maps GOOGLE_API_KEY to GEMINI_API_KEY for the SDK runner', async () => {
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  let stdin = '';
+  child.stdin = {
+    write(chunk) {
+      stdin += chunk;
+    },
+    end() {}
+  };
+
+  let capturedEnv = null;
+  const spawnImpl = (_command, _args, options) => {
+    capturedEnv = options.env;
+    setImmediate(() => {
+      child.emit('close', 0);
+    });
+    return child;
+  };
+
+  await sendMessage('hello', 'thread-1', 'C:/work', 'default', 'gemini-3-pro', '', [], {
+    pythonPath: 'python',
+    env: { GOOGLE_API_KEY: 'google-env-key' },
+    spawnImpl,
+    stdoutWrite: () => {}
+  });
+
+  assert.equal(capturedEnv.GEMINI_API_KEY, 'google-env-key');
+  assert.equal(JSON.parse(stdin).apiKey, 'google-env-key');
 });
 
 test('sendMessage forwards fake runner line protocol unchanged', async () => {
@@ -107,6 +161,7 @@ test('sendMessage forwards fake runner line protocol unchanged', async () => {
 
   await sendMessage('hello', 'fake-conversation', 'C:/work', 'default', 'gemini-3-pro', '', [], {
     pythonPath: 'python',
+    env: { GEMINI_API_KEY: 'gemini-env-key' },
     spawnImpl,
     stdoutWrite: (chunk) => output.push(chunk)
   });

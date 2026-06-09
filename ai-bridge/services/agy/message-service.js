@@ -59,6 +59,11 @@ export function buildAgyStdinPayload({
   };
 }
 
+export function resolveAgyApiKey(payload = {}, env = process.env) {
+  const value = payload.apiKey || env.GEMINI_API_KEY || env.GOOGLE_API_KEY || '';
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 function forwardStderrChunk(chunk, stdoutWrite) {
   const text = chunk.toString();
   for (const line of text.split(/\r?\n/)) {
@@ -72,11 +77,25 @@ export async function runAgyRunner(payload, options = {}) {
   const { command, args } = buildAgyRunnerInvocation(options);
   const spawnImpl = options.spawnImpl || spawn;
   const stdoutWrite = options.stdoutWrite || ((chunk) => process.stdout.write(chunk));
+  const runtimeEnv = options.env || process.env;
+  const effectiveApiKey = resolveAgyApiKey(payload, runtimeEnv);
+  if (!effectiveApiKey) {
+    stdoutWrite(`[SEND_ERROR] ${JSON.stringify({
+      success: false,
+      error: 'Agy Gemini API key is not configured. Configure Settings > Providers > Agy > Gemini API key, or set GEMINI_API_KEY / GOOGLE_API_KEY in the IDE environment.'
+    })}\n`);
+    return 1;
+  }
+  const runnerPayload = {
+    ...payload,
+    apiKey: effectiveApiKey
+  };
   const child = spawnImpl(command, args, {
     cwd: payload.cwd || process.cwd(),
     env: {
-      ...process.env,
-      AGY_USE_STDIN: 'true'
+      ...runtimeEnv,
+      AGY_USE_STDIN: 'true',
+      GEMINI_API_KEY: effectiveApiKey
     },
     stdio: ['pipe', 'pipe', 'pipe']
   });
@@ -91,7 +110,7 @@ export async function runAgyRunner(payload, options = {}) {
     forwardStderrChunk(chunk, stdoutWrite);
   });
 
-  child.stdin.write(JSON.stringify(payload));
+  child.stdin.write(JSON.stringify(runnerPayload));
   child.stdin.end();
 
   return new Promise((resolve, reject) => {

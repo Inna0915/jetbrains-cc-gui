@@ -122,6 +122,11 @@ const resolveModelIdForIcon = (
   return modelId;
 };
 
+const getModelIdForIcon = (
+  model: ModelInfo,
+  modelMapping: Record<string, string | undefined>,
+): string => model.actualModelId || resolveModelIdForIcon(model.id, modelMapping, MODEL_ID_TO_MAPPING_KEY);
+
 /**
  * ModelSelect - Model selector component
  * Supports switching between Sonnet 4.5, Opus 4.5, and other models, including Codex models
@@ -239,7 +244,7 @@ export const ModelSelect = ({ value, onChange, models = AVAILABLE_MODELS, curren
       >
         <ProviderModelIcon
           providerId={currentProvider}
-          modelId={resolveModelIdForIcon(currentModel.id, modelMapping, MODEL_ID_TO_MAPPING_KEY)}
+          modelId={getModelIdForIcon(currentModel, modelMapping)}
           size={12}
           colored
         />
@@ -261,7 +266,7 @@ export const ModelSelect = ({ value, onChange, models = AVAILABLE_MODELS, curren
             >
               <ProviderModelIcon
                 providerId={currentProvider}
-                modelId={resolveModelIdForIcon(model.id, modelMapping, MODEL_ID_TO_MAPPING_KEY)}
+                modelId={getModelIdForIcon(model, modelMapping)}
                 size={16}
                 colored
               />

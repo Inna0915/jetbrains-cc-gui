@@ -248,6 +248,8 @@ export interface ModelInfo {
   id: string;
   label: string;
   description?: string;
+  actualModelId?: string;
+  reasoningEffort?: ReasoningEffort;
 }
 
 /**
@@ -394,13 +396,118 @@ export const CODEX_MODELS: ModelInfo[] = [
 /**
  * Agy model list
  */
+export const DEFAULT_AGY_MODEL_ID = 'gemini-3.5-flash@high';
+
 export const AGY_MODELS: ModelInfo[] = [
   {
-    id: 'gemini-3.5-flash',
-    label: 'Gemini 3.5 Flash',
-    description: 'Antigravity SDK default coding model.',
+    id: 'gemini-3.5-flash@medium',
+    actualModelId: 'gemini-3.5-flash',
+    reasoningEffort: 'medium',
+    label: 'Gemini 3.5 Flash (Medium)',
+    description: 'Antigravity default Flash model with medium thinking.',
+  },
+  {
+    id: DEFAULT_AGY_MODEL_ID,
+    actualModelId: 'gemini-3.5-flash',
+    reasoningEffort: 'high',
+    label: 'Gemini 3.5 Flash (High)',
+    description: 'Antigravity default Flash model with high thinking.',
+  },
+  {
+    id: 'gemini-3.5-flash@low',
+    actualModelId: 'gemini-3.5-flash',
+    reasoningEffort: 'low',
+    label: 'Gemini 3.5 Flash (Low)',
+    description: 'Antigravity default Flash model with low thinking.',
+  },
+  {
+    id: 'gemini-3.1-pro@low',
+    actualModelId: 'gemini-3.1-pro',
+    reasoningEffort: 'low',
+    label: 'Gemini 3.1 Pro (Low)',
+    description: 'Gemini 3.1 Pro with low thinking.',
+  },
+  {
+    id: 'gemini-3.1-pro@high',
+    actualModelId: 'gemini-3.1-pro',
+    reasoningEffort: 'high',
+    label: 'Gemini 3.1 Pro (High)',
+    description: 'Gemini 3.1 Pro with high thinking.',
+  },
+  {
+    id: 'claude-sonnet-4-6@thinking',
+    actualModelId: 'claude-sonnet-4-6',
+    reasoningEffort: 'high',
+    label: 'Claude Sonnet 4.6 (Thinking)',
+    description: 'Claude Sonnet 4.6 through Antigravity with thinking enabled.',
+  },
+  {
+    id: 'claude-opus-4-6@thinking',
+    actualModelId: 'claude-opus-4-6',
+    reasoningEffort: 'high',
+    label: 'Claude Opus 4.6 (Thinking)',
+    description: 'Claude Opus 4.6 through Antigravity with thinking enabled.',
+  },
+  {
+    id: 'gpt-oss-120b@medium',
+    actualModelId: 'gpt-oss-120b',
+    reasoningEffort: 'medium',
+    label: 'GPT-OSS 120B (Medium)',
+    description: 'GPT-OSS 120B through Antigravity with medium thinking.',
   },
 ];
+
+const AGY_MODEL_BY_ID: Record<string, ModelInfo> = AGY_MODELS.reduce(
+  (acc, model) => {
+    acc[model.id] = model;
+    return acc;
+  },
+  {} as Record<string, ModelInfo>
+);
+
+export function resolveAgyModelId(modelId: string | undefined | null): string {
+  if (!modelId) {
+    return '';
+  }
+  return AGY_MODEL_BY_ID[modelId]?.actualModelId || modelId;
+}
+
+export function resolveAgyReasoningEffort(modelId: string | undefined | null): ReasoningEffort | undefined {
+  if (!modelId) {
+    return undefined;
+  }
+  return AGY_MODEL_BY_ID[modelId]?.reasoningEffort;
+}
+
+export function getAgyModelIdForReasoning(
+  modelId: string | undefined | null,
+  reasoningEffort: ReasoningEffort,
+): string {
+  const actualModelId = resolveAgyModelId(modelId) || resolveAgyModelId(DEFAULT_AGY_MODEL_ID);
+  const normalizedEffort = reasoningEffort === 'xhigh' || reasoningEffort === 'max'
+    ? 'high'
+    : reasoningEffort;
+  return AGY_MODELS.find(
+    (model) => model.actualModelId === actualModelId && model.reasoningEffort === normalizedEffort,
+  )?.id || modelId || DEFAULT_AGY_MODEL_ID;
+}
+
+export function normalizeAgyModelSelectionId(
+  modelId: string | undefined | null,
+  reasoningEffort?: ReasoningEffort,
+): string {
+  if (!modelId) {
+    return DEFAULT_AGY_MODEL_ID;
+  }
+  if (AGY_MODEL_BY_ID[modelId]) {
+    return modelId;
+  }
+  const restoredEffort = reasoningEffort || 'high';
+  const matchingBuiltIn = AGY_MODELS.find(
+    (model) => model.actualModelId === modelId && model.reasoningEffort === restoredEffort,
+  );
+  return matchingBuiltIn?.id || modelId;
+}
 
 /**
  * Available models (backward compatibility)

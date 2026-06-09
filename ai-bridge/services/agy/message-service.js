@@ -7,6 +7,17 @@ import initSqlJs from 'sql.js';
 
 const serviceDir = dirname(fileURLToPath(import.meta.url));
 const VALID_AUTH_MODES = new Set(['auto', 'localCli', 'apiKey']);
+const VALID_AGY_REASONING_EFFORTS = new Set(['low', 'medium', 'high']);
+const AGY_MODEL_SELECTIONS = {
+  'gemini-3.5-flash@low': { model: 'gemini-3.5-flash', reasoningEffort: 'low' },
+  'gemini-3.5-flash@medium': { model: 'gemini-3.5-flash', reasoningEffort: 'medium' },
+  'gemini-3.5-flash@high': { model: 'gemini-3.5-flash', reasoningEffort: 'high' },
+  'gemini-3.1-pro@low': { model: 'gemini-3.1-pro', reasoningEffort: 'low' },
+  'gemini-3.1-pro@high': { model: 'gemini-3.1-pro', reasoningEffort: 'high' },
+  'claude-sonnet-4-6@thinking': { model: 'claude-sonnet-4-6', reasoningEffort: 'high' },
+  'claude-opus-4-6@thinking': { model: 'claude-opus-4-6', reasoningEffort: 'high' },
+  'gpt-oss-120b@medium': { model: 'gpt-oss-120b', reasoningEffort: 'medium' }
+};
 const AGY_BOT_BOUNDARY_PATTERN = /2\(bot-[0-9a-f-]+/i;
 const AGY_BOT_BOUNDARY_SUFFIX_PATTERN = /2\(bot-[0-9a-f-]+.*$/i;
 
@@ -41,6 +52,29 @@ export function normalizeAgyAuthMode(authMode) {
   return VALID_AUTH_MODES.has(value) ? value : 'auto';
 }
 
+export function normalizeAgyReasoningEffort(reasoningEffort) {
+  const value = typeof reasoningEffort === 'string' ? reasoningEffort.trim() : '';
+  if (VALID_AGY_REASONING_EFFORTS.has(value)) {
+    return value;
+  }
+  if (value === 'xhigh' || value === 'max') {
+    return 'high';
+  }
+  return null;
+}
+
+export function resolveAgyModelSelection(model, reasoningEffort) {
+  const modelId = typeof model === 'string' ? model.trim() : '';
+  const selected = AGY_MODEL_SELECTIONS[modelId];
+  if (selected) {
+    return { ...selected };
+  }
+  return {
+    model: modelId || null,
+    reasoningEffort: normalizeAgyReasoningEffort(reasoningEffort)
+  };
+}
+
 export function getDefaultAgyCliPath(platform = process.platform) {
   if (platform === 'win32') {
     return join(homedir(), 'AppData', 'Local', 'agy', 'bin', 'agy.exe');
@@ -65,14 +99,15 @@ export function resolveAgyCliPath(options = {}) {
 export function buildAgyCliInvocation(payload = {}, options = {}) {
   const args = [];
   const permissionMode = payload.permissionMode || 'default';
+  const modelSelection = resolveAgyModelSelection(payload.model, payload.reasoningEffort);
   if (permissionMode === 'bypassPermissions') {
     args.push('--dangerously-skip-permissions');
   }
   if (payload.conversationId) {
     args.push('--conversation', payload.conversationId);
   }
-  if (payload.model) {
-    args.push('--model', payload.model);
+  if (modelSelection.model) {
+    args.push('--model', modelSelection.model);
   }
   args.push('--print-timeout', options.printTimeout || payload.printTimeout || '5m');
   args.push('--print', payload.message || '');
@@ -97,17 +132,18 @@ export function buildAgyStdinPayload({
   reasoningEffort,
   authMode
 }) {
+  const modelSelection = resolveAgyModelSelection(model, reasoningEffort);
   return {
     message: message || '',
     conversationId: conversationId || threadId || sessionId || null,
     cwd: cwd || process.cwd(),
     permissionMode: permissionMode || 'default',
-    model: model || null,
+    model: modelSelection.model,
     apiKey: apiKey || null,
     attachments: Array.isArray(attachments) ? attachments : [],
     saveDir: saveDir || null,
     agentPrompt: agentPrompt || null,
-    reasoningEffort: reasoningEffort || null,
+    reasoningEffort: modelSelection.reasoningEffort,
     authMode: normalizeAgyAuthMode(authMode)
   };
 }
@@ -451,15 +487,22 @@ function sanitizeAgyCliStdout(stdoutText) {
   return extractAgyAssistantTextFromPayload(Buffer.from(value)) || value;
 }
 
-function emitAgyResult(text, threadId, stdoutWrite) {
+function emitAgyStreamStart(stdoutWrite) {
   stdoutWrite('[MESSAGE_START]\n');
   stdoutWrite('[STREAM_START]\n');
+}
+
+function emitAgyStreamEnd(stdoutWrite) {
+  stdoutWrite('[STREAM_END]\n');
+  stdoutWrite('[MESSAGE_END]\n');
+}
+
+function emitAgyResult(text, threadId, stdoutWrite) {
   if (threadId) {
     stdoutWrite(`[THREAD_ID] ${threadId}\n`);
   }
   stdoutWrite(`[CONTENT_DELTA] ${JSON.stringify(text)}\n`);
-  stdoutWrite('[STREAM_END]\n');
-  stdoutWrite('[MESSAGE_END]\n');
+  emitAgyStreamEnd(stdoutWrite);
   stdoutWrite(`${JSON.stringify({
     success: true,
     threadId: threadId || null,
@@ -473,6 +516,14 @@ export async function runAgyCliPrint(payload, options = {}) {
   const stdoutWrite = options.stdoutWrite || ((chunk) => process.stdout.write(chunk));
   const runtimeEnv = options.env || process.env;
   let child;
+  let streamStarted = false;
+  let settled = false;
+  const emitStreamEndIfNeeded = () => {
+    if (streamStarted) {
+      emitAgyStreamEnd(stdoutWrite);
+      streamStarted = false;
+    }
+  };
   try {
     child = spawnImpl(command, args, {
       cwd: payload.cwd || process.cwd(),
@@ -486,6 +537,8 @@ export async function runAgyCliPrint(payload, options = {}) {
     })}\n`);
     return 1;
   }
+  emitAgyStreamStart(stdoutWrite);
+  streamStarted = true;
 
   let stdoutText = '';
   const stderrLines = [];
@@ -500,6 +553,11 @@ export async function runAgyCliPrint(payload, options = {}) {
 
   return new Promise((resolve) => {
     child.on('error', (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      emitStreamEndIfNeeded();
       stdoutWrite(`[SEND_ERROR] ${JSON.stringify({
         success: false,
         error: `Failed to start local agy CLI: ${error.message}`
@@ -507,7 +565,12 @@ export async function runAgyCliPrint(payload, options = {}) {
       resolve(1);
     });
     child.on('close', async (code) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       if (code !== 0) {
+        emitStreamEndIfNeeded();
         stdoutWrite(`[SEND_ERROR] ${JSON.stringify({
           success: false,
           error: stderrLines.join('').trim() || `Agy CLI exited with code ${code}`
@@ -525,6 +588,7 @@ export async function runAgyCliPrint(payload, options = {}) {
         return;
       }
       emitAgyResult(result.text, result.threadId, stdoutWrite);
+      streamStarted = false;
       resolve(0);
     });
   });
@@ -545,6 +609,7 @@ export async function runAgyRunner(payload, options = {}) {
   }
   const runnerPayload = {
     ...payload,
+    ...resolveAgyModelSelection(payload.model, payload.reasoningEffort),
     apiKey: effectiveApiKey
   };
   const child = spawnImpl(command, args, {

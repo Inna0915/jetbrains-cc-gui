@@ -202,19 +202,21 @@ async def run(payload: dict[str, Any], emit: Emit = _default_emit) -> int:
     )
 
     emit("[MESSAGE_START]")
-    async with Agent(config) as agent:
-        response = await agent.chat(build_content(payload))
-        emit("[STREAM_START]")
-        thread_id = _conversation_id_from_agent(agent, conversation_id)
-        if thread_id:
-            emit(f"[THREAD_ID] {thread_id}")
-        async for chunk in response.chunks:
-            emit_chunk(chunk, emit)
-        usage = getattr(response, "usage_metadata", None)
-        if usage:
-            emit_usage(usage, emit, session_id=thread_id)
-    emit("[STREAM_END]")
-    emit("[MESSAGE_END]")
+    emit("[STREAM_START]")
+    try:
+        async with Agent(config) as agent:
+            response = await agent.chat(build_content(payload))
+            thread_id = _conversation_id_from_agent(agent, conversation_id)
+            if thread_id:
+                emit(f"[THREAD_ID] {thread_id}")
+            async for chunk in response.chunks:
+                emit_chunk(chunk, emit)
+            usage = getattr(response, "usage_metadata", None)
+            if usage:
+                emit_usage(usage, emit, session_id=thread_id)
+    finally:
+        emit("[STREAM_END]")
+        emit("[MESSAGE_END]")
     return 0
 
 

@@ -2,7 +2,13 @@ import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ButtonAreaProps, ModelInfo, PermissionMode, ReasoningEffort } from './types';
 import { ConfigSelect, ModelSelect, ModeSelect, ProviderSelect, ReasoningSelect } from './selectors';
-import { AGY_MODELS, CLAUDE_MODELS, CODEX_MODELS } from './types';
+import {
+  AGY_MODELS,
+  CLAUDE_MODELS,
+  CODEX_MODELS,
+  getAgyModelIdForReasoning,
+  resolveAgyReasoningEffort,
+} from './types';
 import { STORAGE_KEYS, validateCodexCustomModels } from '../../types/provider';
 import type { CodexCustomModel } from '../../types/provider';
 import { readClaudeModelMapping } from '../../utils/claudeModelMapping';
@@ -251,8 +257,14 @@ export const ButtonArea = ({
    * Handle model selection
    */
   const handleModelSelect = useCallback((modelId: string) => {
+    if (currentProvider === 'agy') {
+      const agyReasoning = resolveAgyReasoningEffort(modelId);
+      if (agyReasoning) {
+        onReasoningChange?.(agyReasoning);
+      }
+    }
     onModelSelect?.(modelId);
-  }, [onModelSelect]);
+  }, [currentProvider, onModelSelect, onReasoningChange]);
 
   /**
    * Handle provider selection
@@ -265,8 +277,14 @@ export const ButtonArea = ({
    * Handle reasoning depth selection
    */
   const handleReasoningChange = useCallback((effort: ReasoningEffort) => {
+    if (currentProvider === 'agy') {
+      const nextAgyModel = getAgyModelIdForReasoning(selectedModel, effort);
+      if (nextAgyModel !== selectedModel) {
+        onModelSelect?.(nextAgyModel);
+      }
+    }
     onReasoningChange?.(effort);
-  }, [onReasoningChange]);
+  }, [currentProvider, onModelSelect, onReasoningChange, selectedModel]);
 
   /**
    * Handle enhance prompt button click

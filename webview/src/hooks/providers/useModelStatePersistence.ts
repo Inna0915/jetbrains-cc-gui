@@ -4,9 +4,12 @@ import {
   CLAUDE_MODELS,
   AGY_MODELS,
   CODEX_MODELS,
+  DEFAULT_AGY_MODEL_ID,
   isValidPermissionMode,
   normalizeClaudeModelId,
+  normalizeAgyModelSelectionId,
   apply1MContextSuffix,
+  resolveAgyReasoningEffort,
   strip1MContextSuffix,
 } from '../../components/ChatInputBox/types';
 import type { PermissionMode, ReasoningEffort } from '../../components/ChatInputBox/types';
@@ -92,11 +95,12 @@ export function useModelStatePersistence(options: UseModelStatePersistenceOption
       let restoredProvider = 'claude';
       let restoredClaudeModel = CLAUDE_MODELS[0].id;
       let restoredCodexModel = CODEX_MODELS[0].id;
-      let restoredAgyModel = AGY_MODELS[0].id;
+      let restoredAgyModel = DEFAULT_AGY_MODEL_ID;
       let restoredClaudePermissionMode: PermissionMode = 'bypassPermissions';
       let restoredCodexPermissionMode: PermissionMode = 'default';
       let restoredAgyPermissionMode: PermissionMode = 'default';
       let restoredLongContextEnabled = true;
+      let restoredReasoningEffort: ReasoningEffort = 'high';
 
       if (saved) {
         const state = JSON.parse(saved);
@@ -124,7 +128,8 @@ export function useModelStatePersistence(options: UseModelStatePersistenceOption
         }
 
         if (isReasoningEffort(state.reasoningEffort)) {
-          setReasoningEffort(state.reasoningEffort);
+          restoredReasoningEffort = state.reasoningEffort;
+          setReasoningEffort(restoredReasoningEffort);
         }
 
         const savedClaudeCustomModels = getCustomModels('claude-custom-models');
@@ -148,12 +153,18 @@ export function useModelStatePersistence(options: UseModelStatePersistenceOption
         }
 
         const savedAgyCustomModels = getCustomModels('agy-custom-models');
+        const normalizedAgyModel = normalizeAgyModelSelectionId(state.agyModel, restoredReasoningEffort);
         if (
-          AGY_MODELS.find(m => m.id === state.agyModel) ||
-          savedAgyCustomModels.find(m => m.id === state.agyModel)
+          AGY_MODELS.find(m => m.id === normalizedAgyModel) ||
+          savedAgyCustomModels.find(m => m.id === normalizedAgyModel)
         ) {
-          restoredAgyModel = state.agyModel;
-          setSelectedAgyModel(state.agyModel);
+          restoredAgyModel = normalizedAgyModel;
+          setSelectedAgyModel(normalizedAgyModel);
+          const agyReasoning = resolveAgyReasoningEffort(normalizedAgyModel);
+          if (agyReasoning) {
+            restoredReasoningEffort = agyReasoning;
+            setReasoningEffort(agyReasoning);
+          }
         }
       }
 
@@ -179,6 +190,9 @@ export function useModelStatePersistence(options: UseModelStatePersistenceOption
               ? restoredAgyModel
               : apply1MContextSuffix(restoredClaudeModel, restoredLongContextEnabled);
           sendBridgeEvent('set_model', modelToSync);
+          if (restoredProvider === 'agy') {
+            sendBridgeEvent('set_reasoning_effort', restoredReasoningEffort);
+          }
           sendBridgeEvent('set_mode', initialPermissionMode);
         } else {
           syncRetryCount++;

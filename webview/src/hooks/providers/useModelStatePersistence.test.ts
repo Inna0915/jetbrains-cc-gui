@@ -14,6 +14,7 @@ describe('useModelStatePersistence', () => {
       provider: 'agy',
       agyModel: 'gemini-3.5-flash',
       agyPermissionMode: 'plan',
+      reasoningEffort: 'high',
     }));
 
     const setCurrentProvider = vi.fn();
@@ -50,14 +51,16 @@ describe('useModelStatePersistence', () => {
     }));
 
     expect(setCurrentProvider).toHaveBeenCalledWith('agy');
-    expect(setSelectedAgyModel).toHaveBeenCalledWith('gemini-3.5-flash');
+    expect(setSelectedAgyModel).toHaveBeenCalledWith('gemini-3.5-flash@high');
+    expect(setReasoningEffort).toHaveBeenCalledWith('high');
     expect(setAgyPermissionMode).toHaveBeenCalledWith('plan');
     expect(setPermissionMode).toHaveBeenCalledWith('plan');
 
     vi.advanceTimersByTime(250);
 
     expect(window.sendToJava).toHaveBeenCalledWith('set_provider:agy');
-    expect(window.sendToJava).toHaveBeenCalledWith('set_model:gemini-3.5-flash');
+    expect(window.sendToJava).toHaveBeenCalledWith('set_model:gemini-3.5-flash@high');
+    expect(window.sendToJava).toHaveBeenCalledWith('set_reasoning_effort:high');
     expect(window.sendToJava).toHaveBeenCalledWith('set_mode:plan');
   });
 });

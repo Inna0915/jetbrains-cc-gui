@@ -12,7 +12,7 @@ except ImportError:  # pragma: no cover - depends on local SDK availability
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from agy_sdk_runner import build_content, build_version_info, emit_chunk, emit_error, emit_usage  # noqa: E402
+from agy_sdk_runner import build_content, build_version_info, emit_chunk, emit_error, emit_usage, run  # noqa: E402
 
 
 class FakeText:
@@ -41,6 +41,47 @@ class FakeUsage:
     output_tokens = 20
     cache_creation_input_tokens = 2
     cache_read_input_tokens = 3
+
+
+class FakeChunkStream:
+    def __init__(self, lines):
+        self.lines = lines
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if not self.lines:
+            raise StopAsyncIteration
+        return self.lines.pop(0)
+
+
+class FakeResponse:
+    def __init__(self, lines):
+        self.chunks = FakeChunkStream(lines)
+        self.usage_metadata = None
+
+
+class FakeConversation:
+    conversation_id = "thread-1"
+
+
+class FakeAgent:
+    events = None
+
+    def __init__(self, _config):
+        self.conversation = FakeConversation()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, _exc_type, _exc, _tb):
+        return False
+
+    async def chat(self, _content):
+        if self.events is not None:
+            self.events.append("[CHAT_CALLED]")
+        return FakeResponse([FakeText()])
 
 
 class AgySdkRunnerTest(unittest.TestCase):
@@ -118,6 +159,31 @@ class AgySdkRunnerTest(unittest.TestCase):
         self.assertEqual(info["package"], "google-antigravity")
         self.assertRegex(info["version"], r"\d+\.\d+")
         self.assertIn("python", info)
+
+    def test_run_emits_stream_start_before_waiting_for_agent_chat(self):
+        import agy_sdk_runner
+
+        original_agent = agy_sdk_runner.Agent
+        agy_sdk_runner.Agent = FakeAgent
+        try:
+            lines = []
+            FakeAgent.events = lines
+
+            import asyncio
+            asyncio.run(run({
+                "message": "hello",
+                "cwd": "C:\\work",
+                "apiKey": "test-key",
+                "authMode": "apiKey",
+            }, lines.append))
+
+            self.assertEqual(lines[0], "[MESSAGE_START]")
+            self.assertEqual(lines[1], "[STREAM_START]")
+            self.assertEqual(lines[2], "[CHAT_CALLED]")
+            self.assertIn('[CONTENT_DELTA] "hello"', lines)
+        finally:
+            FakeAgent.events = None
+            agy_sdk_runner.Agent = original_agent
 
 
 if __name__ == "__main__":

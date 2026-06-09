@@ -4,9 +4,11 @@ import { test } from 'node:test';
 
 import { getAgyCommandList } from '../../channels/agy-channel.js';
 import {
+  buildAgyCliInvocation,
   buildAgyRunnerInvocation,
   buildAgyStdinPayload,
   extractAgyAssistantTextFromPayload,
+  resolveAgyModelSelection,
   sendMessage
 } from './message-service.js';
 
@@ -39,6 +41,30 @@ test('buildAgyRunnerInvocation points at agy_sdk_runner.py', () => {
   assert.equal(invocation.command, 'C:/Python/python.exe');
   assert.equal(invocation.args.length, 1);
   assert.match(invocation.args[0], /agy_sdk_runner\.py$/);
+});
+
+test('resolveAgyModelSelection maps built-in thinking variants to SDK model and high effort', () => {
+  assert.deepEqual(
+    resolveAgyModelSelection('gemini-3.5-flash@high', 'medium'),
+    { model: 'gemini-3.5-flash', reasoningEffort: 'high' }
+  );
+  assert.deepEqual(
+    resolveAgyModelSelection('claude-sonnet-4-6@thinking', ''),
+    { model: 'claude-sonnet-4-6', reasoningEffort: 'high' }
+  );
+});
+
+test('buildAgyCliInvocation strips Agy thinking variant before passing --model', () => {
+  const invocation = buildAgyCliInvocation({
+    message: 'hello',
+    model: 'gemini-3.5-flash@high',
+    reasoningEffort: 'high'
+  }, { cliPath: 'agy' });
+
+  assert.deepEqual(
+    invocation.args.slice(invocation.args.indexOf('--model'), invocation.args.indexOf('--model') + 2),
+    ['--model', 'gemini-3.5-flash']
+  );
 });
 
 test('extractAgyAssistantTextFromPayload skips protobuf metadata before assistant text', () => {
@@ -214,6 +240,36 @@ test('sendMessage uses local agy CLI auth without Gemini key when requested', as
     '[MESSAGE_END]\n',
     '{"success":true,"threadId":"thread-1","result":"CLI answer"}\n'
   ]);
+});
+
+test('sendMessage emits local agy CLI stream start before print process finishes', async () => {
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.stdin = {
+    write() {},
+    end() {}
+  };
+
+  const output = [];
+  const spawnImpl = () => child;
+
+  const pending = sendMessage('hello', 'thread-1', 'C:/work', 'default', 'gemini-3.5-flash@high', '', [], {
+    authMode: 'localCli',
+    cliPath: 'agy',
+    env: {},
+    spawnImpl,
+    stdoutWrite: (chunk) => output.push(chunk)
+  });
+
+  assert.deepEqual(output.slice(0, 2), [
+    '[MESSAGE_START]\n',
+    '[STREAM_START]\n'
+  ]);
+
+  child.stdout.emit('data', Buffer.from('CLI answer\n'));
+  child.emit('close', 0);
+  await pending;
 });
 
 test('sendMessage sanitizes protobuf-like local agy CLI stdout before emitting', async () => {

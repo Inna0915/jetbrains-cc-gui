@@ -242,6 +242,71 @@ test('sendMessage uses local agy CLI auth without Gemini key when requested', as
   ]);
 });
 
+test('sendMessage returns a clear error for image attachments in explicit local agy CLI auth', async () => {
+  const output = [];
+  let spawnCalled = false;
+
+  const exitCode = await sendMessage('read this image', 'thread-1', 'C:/work', 'default', 'gemini-3.5-flash@high', '', [
+    { fileName: 'screenshot.png', mediaType: 'image/png', data: 'iVBORw0KGgo=' }
+  ], {
+    authMode: 'localCli',
+    cliPath: 'agy',
+    env: {},
+    spawnImpl: () => {
+      spawnCalled = true;
+      throw new Error('should not spawn');
+    },
+    stdoutWrite: (chunk) => output.push(chunk)
+  });
+
+  assert.equal(exitCode, 1);
+  assert.equal(spawnCalled, false);
+  assert.equal(output.length, 1);
+  assert.match(output[0], /^\[SEND_ERROR\] /);
+  assert.match(output[0], /image attachments require Agy SDK API-key mode/i);
+});
+
+test('sendMessage auto mode routes image attachments to SDK when a Gemini key is available', async () => {
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  let stdin = '';
+  child.stdin = {
+    write(chunk) {
+      stdin += chunk;
+    },
+    end() {}
+  };
+
+  let capturedCommand = null;
+  const spawnImpl = (command) => {
+    capturedCommand = command;
+    setImmediate(() => {
+      child.emit('close', 0);
+    });
+    return child;
+  };
+
+  const exitCode = await sendMessage('read this image', 'thread-1', 'C:/work', 'default', 'gemini-3.5-flash@high', '', [
+    { fileName: 'screenshot.png', mediaType: 'image/png', data: 'iVBORw0KGgo=' }
+  ], {
+    authMode: 'auto',
+    pythonPath: 'python',
+    cliPath: 'agy',
+    env: { GEMINI_API_KEY: 'gemini-env-key' },
+    spawnImpl,
+    stdoutWrite: () => {}
+  });
+
+  assert.equal(exitCode, 0);
+  assert.equal(capturedCommand, 'python');
+  const payload = JSON.parse(stdin);
+  assert.equal(payload.model, 'gemini-3.5-flash');
+  assert.equal(payload.reasoningEffort, 'high');
+  assert.equal(payload.attachments[0].mediaType, 'image/png');
+  assert.equal(payload.attachments[0].data, 'iVBORw0KGgo=');
+});
+
 test('sendMessage emits local agy CLI stream start before print process finishes', async () => {
   const child = new EventEmitter();
   child.stdout = new EventEmitter();

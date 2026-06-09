@@ -13,6 +13,7 @@ except ImportError:  # pragma: no cover - depends on local SDK availability
 sys.path.insert(0, os.path.dirname(__file__))
 
 from agy_sdk_runner import build_content, build_version_info, emit_chunk, emit_error, emit_usage, run  # noqa: E402
+from google.antigravity.types import Image  # noqa: E402
 
 
 class FakeText:
@@ -68,6 +69,7 @@ class FakeConversation:
 
 class FakeAgent:
     events = None
+    received_content = None
 
     def __init__(self, _config):
         self.conversation = FakeConversation()
@@ -79,6 +81,7 @@ class FakeAgent:
         return False
 
     async def chat(self, _content):
+        self.__class__.received_content = _content
         if self.events is not None:
             self.events.append("[CHAT_CALLED]")
         return FakeResponse([FakeText()])
@@ -153,6 +156,27 @@ class AgySdkRunnerTest(unittest.TestCase):
         self.assertIn("hello", content)
         self.assertIn("a.txt", content)
 
+    def test_build_content_decodes_image_attachments_for_sdk_chat(self):
+        payload = {
+            "message": "你可以读图么",
+            "attachments": [
+                {
+                    "fileName": "screenshot.png",
+                    "mediaType": "image/png",
+                    "data": "iVBORw0KGgo=",
+                },
+            ],
+        }
+
+        content = build_content(payload)
+
+        self.assertIsInstance(content, list)
+        self.assertEqual(content[0], "你可以读图么")
+        self.assertIsInstance(content[1], Image)
+        self.assertEqual(content[1].mime_type, "image/png")
+        self.assertEqual(content[1].data, b"\x89PNG\r\n\x1a\n")
+        self.assertEqual(content[1].description, "screenshot.png")
+
     def test_build_version_info_uses_installed_sdk_metadata(self):
         info = build_version_info()
 
@@ -183,6 +207,7 @@ class AgySdkRunnerTest(unittest.TestCase):
             self.assertIn('[CONTENT_DELTA] "hello"', lines)
         finally:
             FakeAgent.events = None
+            FakeAgent.received_content = None
             agy_sdk_runner.Agent = original_agent
 
 

@@ -167,6 +167,23 @@ function shouldUseLocalCli(payload = {}, options = {}) {
   return authMode === 'localCli' || authMode === 'auto';
 }
 
+function hasAgyImageAttachments(payload = {}) {
+  const attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
+  return attachments.some((attachment) => {
+    const mediaType = typeof attachment?.mediaType === 'string'
+      ? attachment.mediaType
+      : (typeof attachment?.type === 'string' ? attachment.type : '');
+    return mediaType.startsWith('image/') && typeof attachment?.data === 'string' && attachment.data.trim().length > 0;
+  });
+}
+
+function emitAgyImageAttachmentUnsupported(stdoutWrite) {
+  stdoutWrite(`[SEND_ERROR] ${JSON.stringify({
+    success: false,
+    error: 'Agy image attachments require Agy SDK API-key mode. Configure Settings > Providers > Agy > Gemini API key, or set GEMINI_API_KEY / GOOGLE_API_KEY, then use auth mode apiKey or auto.'
+  })}\n`);
+}
+
 function getLastConversationsPath(options = {}) {
   return options.lastConversationsPath
     || join(homedir(), '.gemini', 'antigravity-cli', 'cache', 'last_conversations.json');
@@ -515,6 +532,10 @@ export async function runAgyCliPrint(payload, options = {}) {
   const spawnImpl = options.spawnImpl || spawn;
   const stdoutWrite = options.stdoutWrite || ((chunk) => process.stdout.write(chunk));
   const runtimeEnv = options.env || process.env;
+  if (hasAgyImageAttachments(payload)) {
+    emitAgyImageAttachmentUnsupported(stdoutWrite);
+    return 1;
+  }
   let child;
   let streamStarted = false;
   let settled = false;
@@ -672,6 +693,16 @@ export async function sendMessage(
     reasoningEffort: options.reasoningEffort,
     authMode: options.authMode
   });
+  const authMode = normalizeAgyAuthMode(options.authMode || payload.authMode);
+  if (hasAgyImageAttachments(payload) && authMode !== 'apiKey') {
+    const effectiveApiKey = resolveAgyApiKey(payload, options.env || process.env);
+    if (authMode === 'auto' && effectiveApiKey) {
+      return runAgyRunner(payload, options);
+    }
+    const stdoutWrite = options.stdoutWrite || ((chunk) => process.stdout.write(chunk));
+    emitAgyImageAttachmentUnsupported(stdoutWrite);
+    return 1;
+  }
   if (shouldUseLocalCli(payload, options)) {
     return runAgyCliPrint(payload, options);
   }

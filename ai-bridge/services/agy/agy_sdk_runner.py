@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 from importlib import metadata
 import json
 import os
@@ -9,7 +11,7 @@ import uuid
 from typing import Any, Callable
 
 from google.antigravity import Agent
-from google.antigravity.types import Text, Thought, ToolCall, ToolResult
+from google.antigravity.types import Image, Text, Thought, ToolCall, ToolResult
 
 from permission_policy import build_config
 
@@ -162,23 +164,70 @@ def emit_error(exc: BaseException, emit: Emit = _default_emit) -> None:
     emit_json_marker("[SEND_ERROR]", {"success": False, "error": str(exc)}, emit)
 
 
-def build_content(payload: dict[str, Any]) -> str:
+def _attachment_file_name(attachment: dict[str, Any]) -> str:
+    return str(attachment.get("fileName") or attachment.get("name") or "attachment")
+
+
+def _attachment_media_type(attachment: dict[str, Any]) -> str:
+    return str(attachment.get("mediaType") or attachment.get("type") or "unknown")
+
+
+def _decode_base64_attachment_data(value: Any) -> bytes | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    raw = value.strip()
+    if raw.startswith("data:") and "," in raw:
+        raw = raw.split(",", 1)[1]
+    try:
+        return base64.b64decode(raw, validate=True)
+    except (binascii.Error, ValueError):
+        return None
+
+
+def _build_image_attachment(attachment: dict[str, Any]) -> Image | None:
+    media_type = _attachment_media_type(attachment)
+    if not media_type.startswith("image/"):
+        return None
+    data = _decode_base64_attachment_data(attachment.get("data"))
+    if data is None:
+        return None
+    return Image(
+        data=data,
+        mime_type=media_type,
+        description=_attachment_file_name(attachment),
+    )
+
+
+def build_content(payload: dict[str, Any]) -> Any:
     parts: list[str] = []
+    media_items: list[Any] = []
+    attachment_lines: list[str] = []
     message = payload.get("message") or payload.get("text") or ""
     if message:
         parts.append(str(message))
 
     attachments = payload.get("attachments") or []
     if attachments:
-        parts.append("\nAttachments:")
         for attachment in attachments:
             if not isinstance(attachment, dict):
                 continue
-            file_name = attachment.get("fileName") or attachment.get("name") or "attachment"
-            media_type = attachment.get("mediaType") or attachment.get("type") or "unknown"
-            parts.append(f"- {file_name} ({media_type})")
+            image = _build_image_attachment(attachment)
+            if image is not None:
+                media_items.append(image)
+                continue
+            file_name = _attachment_file_name(attachment)
+            media_type = _attachment_media_type(attachment)
+            attachment_lines.append(f"- {file_name} ({media_type})")
 
-    return "\n".join(parts).strip()
+    if attachment_lines:
+        parts.append("Attachments:")
+        parts.extend(attachment_lines)
+
+    text_content = "\n".join(parts).strip()
+    if media_items:
+        return ([text_content] if text_content else []) + media_items
+
+    return text_content
 
 
 def _conversation_id_from_agent(agent: Agent, fallback: str | None) -> str | None:

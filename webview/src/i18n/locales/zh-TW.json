@@ -1434,6 +1434,18 @@
       "tooltipDisabled": "Haiku不支援1M上下文"
     },
     "codex": {
+      "gpt56sol": {
+        "label": "GPT-5.6 Sol",
+        "description": "旗艦 GPT-5.6 模型，適用於複雜編程、電腦操作、研究及網路安全。"
+      },
+      "gpt56terra": {
+        "label": "GPT-5.6 Terra",
+        "description": "均衡的 GPT-5.6 模型，以較低成本為日常工作提供強勁效能。"
+      },
+      "gpt56luna": {
+        "label": "GPT-5.6 Luna",
+        "description": "快速且實惠的 GPT-5.6 模型，適合高效率、大量的工作負載。"
+      },
       "gpt53codex": {
         "label": "GPT-5.3-Codex",
         "description": "最新前沿智慧編程模型，能力全面增強"

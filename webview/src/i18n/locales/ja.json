@@ -1434,6 +1434,18 @@
       }
     },
     "codex": {
+      "gpt56sol": {
+        "label": "GPT-5.6 Sol",
+        "description": "複雑なコーディング、コンピューター操作、調査、サイバーセキュリティ向けのフラッグシップGPT-5.6モデル。"
+      },
+      "gpt56terra": {
+        "label": "GPT-5.6 Terra",
+        "description": "低コストで高い性能を発揮する、日常業務向けのバランス型GPT-5.6モデル。"
+      },
+      "gpt56luna": {
+        "label": "GPT-5.6 Luna",
+        "description": "効率的な大規模ワークロード向けの、高速で手頃なGPT-5.6モデル。"
+      },
       "gpt53codex": {
         "label": "GPT-5.3-Codex",
         "description": "最新の最先端エージェントコーディングモデル（機能強化版）"

@@ -11,3 +11,28 @@ test('normalizeCodexReasoningEffort preserves max', async () => {
   assert.equal(codexChannel.normalizeCodexReasoningEffort(''), 'medium');
   assert.equal(codexChannel.normalizeCodexReasoningEffort('xhigh'), 'xhigh');
 });
+
+test('handleCodexCommand forwards max reasoning effort to sendMessage', async () => {
+  const { handleCodexCommand } = await import('./codex-channel.js');
+  assert.equal(handleCodexCommand.length, 4);
+
+  let capturedArgs;
+  const sendMessage = async (...args) => {
+    capturedArgs = args;
+  };
+
+  await handleCodexCommand('send', [], {
+    message: 'hello',
+    threadId: 'thread-1',
+    cwd: 'C:\\workspace',
+    permissionMode: 'default',
+    model: 'gpt-5.6',
+    baseUrl: 'https://example.test',
+    apiKey: 'test-key',
+    reasoningEffort: 'max',
+    serviceTier: 'default',
+    attachments: []
+  }, { sendMessage });
+
+  assert.equal(capturedArgs[7], 'max');
+});

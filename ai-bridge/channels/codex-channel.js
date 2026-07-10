@@ -13,8 +13,12 @@ export function normalizeCodexReasoningEffort(reasoningEffort) {
  * @param {string} command
  * @param {string[]} args
  * @param {object|null} stdinData
+ * @param {object|undefined} services
  */
-export async function handleCodexCommand(command, args, stdinData) {
+export async function handleCodexCommand(command, args, stdinData, services) {
+  const sendMessage = services?.sendMessage || codexSendMessage;
+  const getMcpServerTools = services?.getMcpServerTools || codexGetMcpServerTools;
+
   switch (command) {
     case 'send': {
       if (stdinData && stdinData.message !== undefined) {
@@ -30,7 +34,7 @@ export async function handleCodexCommand(command, args, stdinData) {
           serviceTier,
           attachments  // Image attachments (local_image format)
         } = stdinData;
-        await codexSendMessage(
+        await sendMessage(
           message,
           threadId || '',
           cwd || '',
@@ -43,7 +47,7 @@ export async function handleCodexCommand(command, args, stdinData) {
           attachments || []  // Pass attachments to message service
         );
       } else {
-        await codexSendMessage(args[0], args[1], args[2], args[3], args[4]);
+        await sendMessage(args[0], args[1], args[2], args[3], args[4]);
       }
       break;
     }
@@ -51,7 +55,7 @@ export async function handleCodexCommand(command, args, stdinData) {
     case 'getMcpServerTools': {
       const serverId = stdinData?.serverId || args[0] || null;
       const serverConfig = stdinData?.serverConfig || null;
-      await codexGetMcpServerTools(serverId, serverConfig);
+      await getMcpServerTools(serverId, serverConfig);
       break;
     }
 

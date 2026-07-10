@@ -4,6 +4,10 @@
 import { sendMessage as codexSendMessage } from '../services/codex/message-service.js';
 import { getMcpServerTools as codexGetMcpServerTools } from '../services/codex/message-service.js';
 
+export function normalizeCodexReasoningEffort(reasoningEffort) {
+  return reasoningEffort || 'medium';
+}
+
 /**
  * Execute a Codex command.
  * @param {string} command
@@ -34,7 +38,7 @@ export async function handleCodexCommand(command, args, stdinData) {
           model || '',
           baseUrl || '',
           apiKey || '',
-          (reasoningEffort === 'max' ? 'xhigh' : (reasoningEffort || 'medium')),
+          normalizeCodexReasoningEffort(reasoningEffort),
           serviceTier || '',
           attachments || []  // Pass attachments to message service
         );

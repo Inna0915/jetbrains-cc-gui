@@ -1546,6 +1546,18 @@
       "tooltipDisabled": "Haiku에서는 1M 컨텍스트를 사용할 수 없습니다"
     },
     "codex": {
+      "gpt56sol": {
+        "label": "GPT-5.6 Sol",
+        "description": "복잡한 코딩, 컴퓨터 사용, 연구 및 사이버 보안을 위한 플래그십 GPT-5.6 모델."
+      },
+      "gpt56terra": {
+        "label": "GPT-5.6 Terra",
+        "description": "더 낮은 비용으로 강력한 성능을 제공하는 일상 업무용 균형 잡힌 GPT-5.6 모델."
+      },
+      "gpt56luna": {
+        "label": "GPT-5.6 Luna",
+        "description": "효율적인 대용량 워크로드를 위한 빠르고 경제적인 GPT-5.6 모델."
+      },
       "gpt53codex": {
         "label": "GPT-5.3-Codex",
         "description": "향상된 기능의 최신 프론티어 에이전트 코딩 모델."

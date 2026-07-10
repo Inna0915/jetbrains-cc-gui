@@ -1672,6 +1672,18 @@
       }
     },
     "codex": {
+      "gpt56sol": {
+        "label": "GPT-5.6 Sol",
+        "description": "旗舰 GPT-5.6 模型，适用于复杂编程、计算机操作、研究和网络安全。"
+      },
+      "gpt56terra": {
+        "label": "GPT-5.6 Terra",
+        "description": "均衡的 GPT-5.6 模型，以更低成本为日常工作提供强劲性能。"
+      },
+      "gpt56luna": {
+        "label": "GPT-5.6 Luna",
+        "description": "快速且经济的 GPT-5.6 模型，适合高效、大规模工作负载。"
+      },
       "gpt53codex": {
         "label": "GPT-5.3-Codex",
         "description": "最新前沿智能编程模型，能力全面增强"

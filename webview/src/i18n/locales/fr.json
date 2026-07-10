@@ -1429,6 +1429,18 @@
       "tooltipDisabled": "1M contexte non disponible pour Haiku"
     },
     "codex": {
+      "gpt56sol": {
+        "label": "GPT-5.6 Sol",
+        "description": "Modèle phare GPT-5.6 pour le codage complexe, l'utilisation d'ordinateurs, la recherche et la cybersécurité."
+      },
+      "gpt56terra": {
+        "label": "GPT-5.6 Terra",
+        "description": "Modèle GPT-5.6 équilibré pour le travail quotidien, offrant de hautes performances à moindre coût."
+      },
+      "gpt56luna": {
+        "label": "GPT-5.6 Luna",
+        "description": "Modèle GPT-5.6 rapide et abordable pour des charges de travail efficaces et à grand volume."
+      },
       "gpt53codex": {
         "label": "GPT-5.3-Codex",
         "description": "Dernier modèle de codage agentique avec des capacités améliorées."

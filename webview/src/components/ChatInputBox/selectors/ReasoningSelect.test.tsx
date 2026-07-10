@@ -9,6 +9,43 @@ vi.mock('react-i18next', () => ({
 }));
 
 describe('ReasoningSelect', () => {
+  it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'])(
+    'shows max for Codex model %s',
+    (selectedModel) => {
+      render(
+        <ReasoningSelect
+          value="high"
+          onChange={vi.fn()}
+          currentProvider="codex"
+          selectedModel={selectedModel}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button'));
+
+      expect(screen.getByText('Max')).toBeTruthy();
+    },
+  );
+
+  it('resets max and hides it for older Codex models', () => {
+    const onChange = vi.fn();
+
+    render(
+      <ReasoningSelect
+        value="max"
+        onChange={onChange}
+        currentProvider="codex"
+        selectedModel="gpt-5.5"
+      />,
+    );
+
+    expect(onChange).toHaveBeenCalledWith('high');
+
+    fireEvent.click(screen.getByRole('button'));
+
+    expect(screen.queryByText('Max')).toBeNull();
+  });
+
   it('shows xhigh and max for Claude Opus 4.8', () => {
     render(
       <ReasoningSelect
